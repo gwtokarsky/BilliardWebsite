@@ -1,82 +1,130 @@
-import React, { useState, useEffect } from 'react';
-import { Stage, Container, Graphics, Text } from '@pixi/react';
-import PolygonBuilder from './polygonBuilder';
+import React, { useState, useEffect, useRef } from 'react';
+import * as d3 from 'd3';
+import { Console } from 'console';
 
-const pixel_offset_byscale=[]
+interface Polygon {
+  points: [number, number][];
+  fillColor: string;
+}
 
-const Game = () => {
-    const [points, setPoints] = useState([[[0,0],[0,0],[0,0]],[[0,0],[0,0],[0,0]]]);
-    const [width, setWidth] = useState(0);
-    const [height, setHeight] = useState(0);
-    const [borderColor, setBorderColor] = useState(0x000000); // Use hexadecimal for color
-    const [colors, setColor] = useState([0x800000, 0x808080, 0x808080, 0x808080, 0x062e03, 0x0000ff, 0xff0000, 0xffff00, 0x800080, 0xffa500, 0xffc0cb, 0xa52a2a]); // Use hexadecimal for color
-    const [zoom, setZoom] = useState(6);
-    const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-    const [val, setVal] = useState(1)
+const Game: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [scale, setScale] = useState(500);
+  const [renderFlag, setRenderFlag] = useState(false);
+  const [translate, setTranslate] = useState([0, 0]);
 
-    useEffect(() => {
-        const scale = Math.min(window.innerHeight , window.innerWidth) / 200;
-        setVal(scale);
-        const start = [window.innerWidth/2 - scale*75,0]
-        setPoints([
-            [[0, 180 * scale], [0, 0], [180 * scale, 180 * scale]],
-            [[0, 0], [90 * scale, 90 * scale], [0, 90 * scale]],
-            [[90 * scale, 180 * scale], [180 * scale, 180 * scale], [90 * scale, 90 * scale]], 
-            [[0, 180 * scale], [45 * scale, 135 * scale], [90 * scale, 180 * scale]],
-            [[0, 90 * scale], [90 * scale, 90 * scale], [90 * scale, 180 * scale]],
-            [[6 * scale,(180 - 39) * scale], [9 * scale,(180 - 36) * scale], [9 * scale,(180 - 26) * scale], [6 * scale,(180 - 29) * scale]],
-        ]); 
-        setWidth(window.innerWidth);
-        setHeight(window.innerHeight);
+  useEffect(() => {
+    const canvasSize = Math.min(window.innerWidth, window.innerHeight) / 1.5;
+    setScale(canvasSize);
 
-        const handleMouseMove = (e:any) => {
-            const stageElement = document.querySelector('canvas');
-            if (!stageElement) {
-                return;
-            }
+    // Rest of your code...
 
-            const rect = stageElement.getBoundingClientRect();
-            const relativeX = e.clientX - rect.left;
-            const relativeY = e.clientY - rect.top;
+    
+    const polygons: Polygon[] = [
+      {
+        points: [[0, canvasSize], [0, 0], [canvasSize, canvasSize]],
+        fillColor: 'grey'
+      },
+      {
+        points: [
+          [500, 500],
+          [500, 250],
+          [250, 250],
+          [250, 500]
+        ],
+        fillColor: 'green'
+      }
+    ];
 
-            // Update the state with the relative mouse position
-            setMousePosition({ x: relativeX / scale, y: relativeY / scale });
-        };
+    const canvas = d3.select(canvasRef.current);
 
-        // Add event listener when component mounts
-        document.addEventListener('mousemove', handleMouseMove);
+    const context = canvas.node()!.getContext('2d');
 
-        // Clean up event listener when component unmounts
-        return () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-        };
-    }, []);
-
-    const foo = () => {
-        let polygons = [];
-        for (let i = 0; i < points.length; i++) {
-            polygons.push(
-                <Container scale={zoom} key={i}>
-                    <PolygonBuilder points={points[i]} borderColor={borderColor} color={colors[i]}/>
-                </Container>
-            );
-        }
-        return polygons;
+    if (!context) {
+      throw new Error("Could not create 2D rendering context.");
     }
 
-    return (
-        <div>
-            <Stage width={val*190*zoom} height={val*190*zoom} options={{ backgroundColor: 0xffffff }} style={{position:'absolute', left:'10px', top:'10px'}}>
-                {foo()}
-            </Stage>
+    const render = () => {
+      context.clearRect(-10000, -10000, context.canvas.width * 10000, context.canvas.height * 10000);
+      context.save();
 
-            <div style={{ position: 'fixed', top: '10px', left: '80px' }}>
-                <p>Displaced Mouse Position:</p>
-                <p>X: {(mousePosition.x) / zoom}</p>
-                <p>Y: {(-mousePosition.y)/zoom + 180}</p>
-            </div>
-        </div>
-    );
+      context.scale(zoom, zoom);
+
+      context.translate(translate[0] / zoom, translate[1] / zoom); // Update translation with zoom
+
+      polygons.forEach(polygon => {
+        context.beginPath();
+        context.moveTo((polygon.points[0][0]), polygon.points[0][1]);
+        polygon.points.slice(1).forEach(point => {
+          context.lineTo(point[0], point[1]);
+        });
+        context.closePath();
+        context.fillStyle = polygon.fillColor;
+        context.fill();
+      });
+
+      context.restore();
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+        const rect = canvasRef.current!.getBoundingClientRect();
+        const relativeX = e.clientX - rect.left;
+        const relativeY = e.clientY - rect.top;
+
+        // Adjust mouse position based on scale factor
+        const adjustedX = (relativeX - translate[0]) / scale * 180 / zoom;
+        const adjustedY = 180 - (relativeY - translate[1]) / scale * 180 / zoom;
+
+        setMousePosition({ 
+        x: adjustedX,
+        y: adjustedY
+        });
+    };
+
+    const zoomBehavior: any = d3.zoom().on('zoom', (event) => {
+      setZoom(event.transform.k);
+      setTranslate([event.transform.x, event.transform.y]);
+    });
+
+    // Render initial state
+    render();
+
+    // Add zoom behavior
+    canvas.call(zoomBehavior);
+
+    // Add event listeners when component mounts
+    canvasRef.current!.addEventListener('mousemove', handleMouseMove);
+
+    if (!renderFlag) {
+      setRenderFlag(true);
+    }
+    // Clean up event listeners when component unmounts
+    return () => {
+      canvasRef.current!.removeEventListener('mousemove', handleMouseMove);
+    };
+
+
+
+
+  }, [zoom, renderFlag]); // Re-run effect when zoom changes
+
+  return (
+    <div>
+      <canvas
+        ref={canvasRef}
+        width={scale}
+        height={scale}
+      />
+      <div style={{ position: 'fixed', top: '10px', left: '80px' }}>
+        <p>Displaced Mouse Position:</p>
+        <p>X: {mousePosition.x}</p>
+        <p>Y: {mousePosition.y}</p>
+        <p>Zoom: {zoom.toFixed(2)}</p>
+      </div>
+    </div>
+  );
 };
 
 export default Game;
