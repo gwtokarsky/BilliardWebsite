@@ -22,6 +22,9 @@ const Game: React.FC = () => {
   const [translate, setTranslate] = useState([0, 0]);
   const [polygons, setPolygons] = useState<Polygon[]>([]);
   const [selectedCover, setSelectedCover] = useState(null);
+  const [selectedCorners, setSelectedCorners] = useState([]);
+  const [selectedPoints, setSelectedPoints] = useState(0);
+  const [isSelectedComplete, setIsSelectedComplete] = useState(false);
   const [regions, setRegions] = useState([]);
   const [covers, setCovers] = useState([]);
 
@@ -238,6 +241,8 @@ const Game: React.FC = () => {
         <p>Y: {mousePosition.y}</p>
         <p>Zoom: {zoom.toFixed(2)}</p>
         <p>Selected Cover: {(selectedCover as any) ? (selectedCover as any).cover_id : 'None'}</p>
+        <p>Selected Points: {(selectedCover as any) ? (selectedCover as any).cover_points : 'None'}</p>
+        <p>Selected Cover: {(selectedCover as any) ? (JSON.stringify((selectedCover as any).corners)) : 'None'}</p>
       </div>
     </div>
   );
