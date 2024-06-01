@@ -11,20 +11,23 @@
   "dependencies": {
     "@pixi/react": "^7.1.2",
     "@turf/turf": "^6.5.0",
+    "@types/uuid": "^9.0.8",
     "axios": "^1.6.8",
+    "bcryptjs": "^2.4.3",
     "canvas": "^2.11.2",
     "d3": "^7.9.0",
     "decimal.js": "^10.4.3",
     "dotenv": "^16.4.5",
     "iron-session": "^8.0.1",
-    "next": "14.2.3",
+    "next": "^14.2.3",
     "pg": "^8.11.5",
     "pixi.js": "^8.1.1",
     "react": "^18",
     "react-dom": "^18",
     "react-konva": "^18.2.10",
     "ts-node": "^10.9.2",
-    "turf": "^3.0.14"
+    "turf": "^3.0.14",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",

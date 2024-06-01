@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import * as d3 from 'd3';
 import { Console } from 'console';
-import { getCoversFromRegionWithCorners, getCoversWithCorners, getRegionsWithCorners} from '@/actions/actions';
+import { getCoversFromRegionWithCorners, getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover} from '@/actions/actions';
 import { get } from 'http';
 
 interface Polygon {
@@ -12,8 +12,11 @@ interface Polygon {
   stroke?: string;
 }
 
+interface Props {
+  user_id: string;
+}
 
-const Game: React.FC = () => {
+const Game: React.FC<Props> = ({ user_id }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -27,6 +30,9 @@ const Game: React.FC = () => {
   const [isSelectedComplete, setIsSelectedComplete] = useState(false);
   const [regions, setRegions] = useState([]);
   const [covers, setCovers] = useState([]);
+  const [userInfo, setUserInfo] = useState("");  
+  const [username, setUsername] = useState("");
+  const [userId, setUserId] = useState("");
 
 
   const loadRegions = async () => {
@@ -57,18 +63,43 @@ const Game: React.FC = () => {
       await new Promise(r => setTimeout(r, 1000));
     });
 
-
-    covers.map(async (region: any) => {
+    const ptempcomplete = [] as Polygon[];
+    const ptempclaimed = [] as Polygon[];
+    await covers.map(async (region: any) => {
       const corners = region.corners.map((corner: any) => [corner.f1 / 180 * canvasSize, (180 - corner.f2) / 180 * canvasSize]);  
+      let s;
+      if (region.completed) {
+        s = 'green';
+      }
+      else if (region.claimed) {
+        s = 'orange';
+      }
+      else {
+        s = 'maroon';
+      }
       const polygon: Polygon = {
         points: corners,
-        stroke: 'maroon',
+        stroke: s,
       };
 
-      p.push(polygon);
-      await setPolygons(p);
-      await new Promise(r => setTimeout(r, 1000));
+      if (s === 'maroon') {
+        p.push(polygon);
+      }
+      else if (s === 'orange') {
+        ptempclaimed.push(polygon);
+      }
+      else {
+        ptempcomplete.push(polygon);
+      }
     });
+
+    for (let i = 0; i < ptempclaimed.length; i++) {
+      p.push(ptempclaimed[i]);
+    }
+    for (let i = 0; i < ptempcomplete.length; i++) {
+      p.push(ptempcomplete[i]);
+    } 
+    await setPolygons(p);
   };
 
   const findContainingCover = async (x: number, y: number) => {
@@ -158,10 +189,16 @@ const Game: React.FC = () => {
   }, [covers]);
 
   useEffect(() => {
+    if (!(user_id === null || user_id === undefined || user_id === '')) {
+      setUserId(user_id);
+    }
     const handleMouseClick = async (e: MouseEvent) => {
       let cover = await findContainingCover(mousePosition.x, mousePosition.y);
       if (cover !== null) {
         await setSelectedCover(cover);
+        //add a button beneath the canvas that says "claim cover" and when clicked, it will set cover to claimed by the user
+
+
       }
     };
     canvasRef.current!.removeEventListener('click', handleMouseClick);
@@ -176,6 +213,17 @@ const Game: React.FC = () => {
   }
   , []);
 
+  useEffect(() => {
+    async function getUserInfo() {
+      if (user_id === null || user_id === undefined || user_id === '') {
+        return;
+      }
+      const username = await getUsernameFromId(userId);
+      await setUsername(username);
+    }
+    getUserInfo();
+  }, [userId]);
+
   const polygonLength = (polygon: Polygon) => {
     //get maximum distance between two consecutive points
     let maxDistance = 0;
@@ -188,6 +236,10 @@ const Game: React.FC = () => {
     });
     return maxDistance;
   };
+
+  //if userId is null, check for a user id in the props
+
+
 
 
   const render = () => {
@@ -222,6 +274,9 @@ const Game: React.FC = () => {
     });
 
     context.restore();
+
+    
+
   };
 
   useEffect(() => {
@@ -236,6 +291,39 @@ const Game: React.FC = () => {
         height={scale}
       />
       <div style={{ position: 'fixed', top: '10px', left: '80px' }}>
+        <button
+          style={{
+            position: 'fixed',
+            top: `calc(${scale + 100}px)`,
+            left: `calc(50% - ${scale / 2 - 50}px)`,
+            transform: 'translateX(-50%)'
+          }}
+          onClick={async () => {
+            if (selectedCover) {
+              await claimCover((selectedCover as any).cover_id, user_id)
+            }
+          }}
+        >
+          Claim Cover
+        </button>
+        <button
+          style={{
+            position: 'fixed',
+            top: `calc(${scale + 100}px)`,
+            left: `calc(50% + ${scale / 2 - 50}px)`,
+            transform: 'translateX(-50%)'
+          }}
+
+          onClick={async () => {
+            if (selectedCover) {
+              await completeCover((selectedCover as any).cover_id, user_id)
+            }
+          }}
+        >
+          Complete Cover
+        </button>
+        
+
         <p>Displaced Mouse Position:</p>
         <p>X: {mousePosition.x}</p>
         <p>Y: {mousePosition.y}</p>
@@ -243,6 +331,7 @@ const Game: React.FC = () => {
         <p>Selected Cover: {(selectedCover as any) ? (selectedCover as any).cover_id : 'None'}</p>
         <p>Selected Points: {(selectedCover as any) ? (selectedCover as any).cover_points : 'None'}</p>
         <p>Selected Cover: {(selectedCover as any) ? (JSON.stringify((selectedCover as any).corners)) : 'None'}</p>
+        <p>Username: {username}</p>
       </div>
     </div>
   );
