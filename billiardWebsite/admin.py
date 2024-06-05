@@ -1,7 +1,6 @@
 import psycopg2
 import os
 from shapely.geometry import Polygon
-import sys
 from dotenv import load_dotenv
 
 
@@ -21,9 +20,9 @@ def main():
         cursor.execute('SET search_path TO kaiden')
         conn.commit()
 
-        print("c to create a new cover, r to create a new region, ec to edit a cover,")
-        print("er to edit a region, dc to delete a cover, dr to delete a region,")
-        print("o to complete a cover, q to quit")
+        print("c to create a new cover, r to create a new region, cf to add covers from file,")
+        print("dc to delete a cover, dr to delete a region,")
+        print("o to complete a cover manually, x to manage cover completion requests, q to quit")
 
         while True:
             choice = input("Enter your choice: ")
@@ -54,7 +53,15 @@ def main():
                 region_id = int(input("Enter the region id to add the cover to: "))
                 create_covers_from_file(cover_file, region_id, cursor)
                 conn.commit()
-
+            elif choice == 'dc':
+                pass
+            elif choice == 'dr':
+                pass
+            elif choice == 'o':
+                cover_id = int(input("Enter the cover id: "))
+                username = input("Enter the username: ")
+                complete_cover_manually(cover_id, username, cursor)
+                conn.commit()
             elif choice == 'q':
                 cursor.close()
                 conn.close()
@@ -180,4 +187,31 @@ def validate_region(region, cursor):
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error creating region:", error)
 
+def complete_cover_manually(cover_id, username, cursor):
+    try:
+        cursor.execute("SELECT id FROM covers WHERE id = %s", (cover_id,))
+        rows = cursor.fetchone()
+        if not rows:
+            raise Exception("Cover does not exist")
+        
+        #cover cannot be already completed
+        cursor.execute("SELECT cover_id FROM user_completed_cover WHERE cover_id = %s", (cover_id,))
+        rows = cursor.fetchone()
+        if rows:
+            raise Exception("Cover already completed")
+        
+        cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+        rows = cursor.fetchone()
+        if not rows:
+            raise Exception("User does not exist")
+        
+
+        cursor.execute("INSERT INTO user_completed_cover (cover_id, user_id) VALUES (%s, %s)", (cover_id, rows[0]))
+        print("Cover completion request submitted")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error completing cover manually:", error)
+        
+
 main()
+
+#dwdw
