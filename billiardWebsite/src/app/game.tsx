@@ -245,7 +245,6 @@ const Game: React.FC<Props> = ({ user_id }) => {
   const render = () => {
     const canvas = d3.select(canvasRef.current);
     canvas.style('border', '3px solid black');
-
     const context = canvas.node()!.getContext('2d');
 
     if (!context) {
@@ -253,10 +252,10 @@ const Game: React.FC<Props> = ({ user_id }) => {
     }
     context.clearRect(-10000, -10000, context.canvas.width * 10000, context.canvas.height * 10000);
     context.save();
-
     context.scale(zoom, zoom);
+    context.translate(translate[0] / zoom, translate[1] / zoom);
 
-    context.translate(translate[0] / zoom, translate[1] / zoom); // Update translation with zoom
+    // Draw polygons
     polygons.forEach(polygon => {
       context.beginPath();
       context.moveTo((polygon.points[0][0]), polygon.points[0][1]);
@@ -265,23 +264,39 @@ const Game: React.FC<Props> = ({ user_id }) => {
       });
       context.closePath();
       context.fillStyle = polygon.fillColor ?? 'transparent';
-      context.lineWidth = Math.min((polygonLength(polygon) / 25), 4/zoom);
-      context.strokeStyle =  polygon.stroke ?? 'black';
+      context.lineWidth = Math.min((polygonLength(polygon) / 25), 4 / zoom);
+      context.strokeStyle = polygon.stroke ?? 'black';
       context.stroke();
       context.globalAlpha = polygon.fillOpacity ?? 1;
-      
       context.fill();
     });
 
+    // Reset transformations to draw fixed text
     context.restore();
+    context.save();
+    context.setTransform(1, 0, 0, 1, 0, 0); // Reset transformation matrix
+    let regex = /[\{\}\[\]:]/g
+    context.font = '14px Arial';
+    context.fillStyle = 'black';
+    const infoLines = [
+      `X: ${mousePosition.x.toFixed(2)} ` + 
+      `Y: ${mousePosition.y.toFixed(2)}`,
+      `Zoom: ${zoom.toFixed(2)}`,
+      `Cover Point Count: ${(selectedCover as any) ? (selectedCover as any).cover_points : 'None'}`,
+      `Selected Cover: ${(selectedCover as any) ? JSON.stringify((selectedCover as any).corners)
+        .replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(regex, '') : 'None'}`,
+      `${(selectedCover as any) ? (selectedCover as any).info : ''}`
+    ];
+    infoLines.forEach((line, index) => {
+      context.fillText(line, 10, 20 + index * 20);
+    });
 
-    
-
+    context.restore();
   };
 
   useEffect(() => {
     render();
-  }, [polygons]);
+  }, [polygons, mousePosition, zoom, selectedCover]);
 
   return (
     <div>
@@ -322,16 +337,6 @@ const Game: React.FC<Props> = ({ user_id }) => {
         >
           Complete Cover
         </button>
-        
-
-        <p>Displaced Mouse Position:</p>
-        <p>X: {mousePosition.x}</p>
-        <p>Y: {mousePosition.y}</p>
-        <p>Zoom: {zoom.toFixed(2)}</p>
-        <p>Selected Cover: {(selectedCover as any) ? (selectedCover as any).cover_id : 'None'}</p>
-        <p>Selected Points: {(selectedCover as any) ? (selectedCover as any).cover_points : 'None'}</p>
-        <p>Selected Cover: {(selectedCover as any) ? (JSON.stringify((selectedCover as any).corners)) : 'None'}</p>
-        <p>Username: {username}</p>
       </div>
     </div>
   );

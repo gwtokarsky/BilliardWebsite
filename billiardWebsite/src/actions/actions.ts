@@ -92,22 +92,30 @@ export async function getCoversFromRegionWithCorners (region_id:number) {
     try {
         client = await pool.connect();
         await client.query('SET search_path TO kaiden');
-        const query = `SELECT 
+        const query =   `SELECT 
                             covers.id AS cover_id, 
                             covers.points AS cover_points, 
                             JSON_AGG((cornerx, cornery) ORDER BY position) AS corners,
-                            EXISTS (SELECT * FROM user_claimed_cover WHERE cover_id = covers.id) AS claimed,
-                            EXISTS (SELECT * FROM user_completed_cover WHERE cover_id = covers.id) AS completed
+                            EXISTS (SELECT 1 FROM user_claimed_cover WHERE cover_id = covers.id) AS claimed,
+                            EXISTS (SELECT 1 FROM user_completed_cover WHERE cover_id = covers.id) AS completed,
+                            claimant.username,
+                            claimant.info
                         FROM 
                             covers
                         JOIN 
                             has_corner ON covers.id = has_corner.cover_id
                         JOIN 
                             cover_in_region ON covers.id = cover_in_region.cover_id
+                        LEFT JOIN 
+                            (SELECT cover_id, username, info 
+                            FROM user_completed_cover
+                            JOIN users ON user_completed_cover.user_id = users.id) AS claimant 
+                        ON 
+                            covers.id = claimant.cover_id
                         WHERE 
                             cover_in_region.region_id = $1
                         GROUP BY 
-                            covers.id, covers.points
+                            covers.id, covers.points, claimant.username, claimant.info
                         ORDER BY 
                             covers.id;`;
         
@@ -158,18 +166,19 @@ export async function getCoversWithCorners () {
 }
 
 
-export async function addUser(username: string, password: string) {
+export async function addUser(username: string, info:string, password: string) {
     let client;
     try {
         client = await pool.connect();
         await client.query('SET search_path TO kaiden');
+        console.log('Adding user:', username, info, password)
 
         // Hash the password
         const hashedPassword = await hashPassword(password);
 
         // Insert the user into the database
-        const query = `INSERT INTO users (username, password) VALUES ($1, $2);`;
-        await client.query(query, [username, hashedPassword]);
+        const query = `INSERT INTO users (username, info, password) VALUES ($1, $2, $3);`;
+        await client.query(query, [username, info, hashedPassword]);
 
         console.log('User added successfully');
     } catch (error) {

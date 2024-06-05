@@ -1,7 +1,8 @@
 
 import { checkIfUserExists, addUser, getUser } from '@/actions/actions';
-const handle_submit = async (username: string, password:string) => {
+const handle_submit = async (username: string, info :string, password:string) => {
     // TODO: Add registration logic here
+    
     if (!username || !password) {
         console.log('Please enter a username and password');
     } else {
@@ -11,7 +12,7 @@ const handle_submit = async (username: string, password:string) => {
             console.log('User already exists');
         } else {
             // Add the user
-            await addUser(username, password);
+            await addUser(username, info, password);
             console.log('User registered successfully');
 
             //Redirect to main page but with user id
