@@ -62,6 +62,9 @@ def main():
                 username = input("Enter the username: ")
                 complete_cover_manually(cover_id, username, cursor)
                 conn.commit()
+            elif choice == 'x':
+                complete_cover_through_request(cursor)
+                conn.commit()
             elif choice == 'q':
                 cursor.close()
                 conn.close()
@@ -210,7 +213,32 @@ def complete_cover_manually(cover_id, username, cursor):
         print("Cover completion request submitted")
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error completing cover manually:", error)
-        
+
+def complete_cover_through_request(cursor):
+    try:
+        cursor.execute("""SELECT a.cover_id, users.id, username, JSON_AGG(json_build_object(cornerx, cornery)) 
+                            FROM cover_completion_request AS a Join users on user_id = users.id
+                            JOIN has_corner on a.cover_id = has_corner.cover_id 
+                            GROUP BY a.cover_id, users.id, username""")
+        rows = cursor.fetchall()
+        for row in rows:
+            print("Cover ID:", row[0])
+            print("Username:", row[2])
+            print("Corners:", row[3])
+            x = input("y to agree to completion request, n to deny, other to pass:")
+            if x == 'y':
+                complete_cover_manually(row[0], row[2], cursor)
+                cursor.execute("DELETE FROM cover_completion_request WHERE cover_id = %s AND user_id = %s", (row[0], row[1]))
+            elif x == 'n':
+                print("Cover completion request denied")
+                cursor.execute("DELETE FROM cover_completion_request WHERE cover_id = %s AND user_id = %s", (row[0], row[1]))
+            else:
+                print("Passed")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error completing cover through request:", error)
+    
+    print("Cover completion requests completed successfully")
+    
 
 main()
 
