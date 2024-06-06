@@ -54,7 +54,9 @@ def main():
                 create_covers_from_file(cover_file, region_id, cursor)
                 conn.commit()
             elif choice == 'dc':
-                pass
+                cover_id = int(input("Enter the cover id: "))
+                delete_cover(cover_id, cursor)
+                conn.commit()
             elif choice == 'dr':
                 pass
             elif choice == 'o':
@@ -238,7 +240,23 @@ def complete_cover_through_request(cursor):
         print("Error completing cover through request:", error)
     
     print("Cover completion requests completed successfully")
-    
+
+
+def delete_cover(cover_id, cursor):
+    try:
+        cursor.execute("SELECT id FROM covers WHERE id = %s", (cover_id,))
+        rows = cursor.fetchone()
+        if not rows:
+            raise Exception("Cover does not exist")
+        
+        cursor.execute("DELETE FROM has_corner WHERE cover_id = %s", (cover_id,))
+        cursor.execute("DELETE FROM cover_in_region WHERE cover_id = %s", (cover_id,))
+        cursor.execute("DELETE FROM user_completed_cover WHERE cover_id = %s", (cover_id,))
+        cursor.execute("DELETE FROM cover_completion_request WHERE cover_id = %s", (cover_id,))
+        cursor.execute("DELETE FROM covers WHERE id = %s", (cover_id,))
+        print("Cover deleted successfully")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error deleting cover:", error)
 
 main()
 

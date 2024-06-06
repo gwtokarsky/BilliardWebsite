@@ -317,7 +317,7 @@ export async function claimCover(cover_id: number, user_id:string) {
         const coversQuery = `SELECT * FROM user_claimed_cover WHERE user_id = $1;`;
         const coversRes = await client.query(coversQuery, [user_id]);
 
-        if (coversRes.rowCount >= 3) {
+        if (coversRes.rowCount >= 2) {
             return false;
         }
 
@@ -325,7 +325,7 @@ export async function claimCover(cover_id: number, user_id:string) {
         const claimedCoverQuery = `SELECT * FROM user_claimed_cover WHERE user_id = $1 AND cover_id = $2;`;
         const claimedCoverRes = await client.query(claimedCoverQuery, [user_id, cover_id]);
 
-        if (claimedCoverRes.rowCount >= 3) {
+        if (claimedCoverRes.rowCount >= 1) {
             return false;
         }
 

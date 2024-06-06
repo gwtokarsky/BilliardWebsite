@@ -11,10 +11,91 @@ interface Polygon {
   fillOpacity?: number;
   stroke?: string;
 }
+const leaderboardData = [
+  { rank: 1, name: 'Alice', score: 1500 },
+  { rank: 2, name: 'Bob', score: 1400 },
+  { rank: 3, name: 'Charlie', score: 1300 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 5, name: 'Eve', score: 1100 },
+  { rank: 4, name: 'David', score: 1200 },
+];
 
+const recentCompletions = [
+  { player: 'Frank', score: 1000, date: '2024-06-05' },
+  { player: 'Grace', score: 900, date: '2024-06-04' },
+  { player: 'Heidi', score: 800, date: '2024-06-03' },
+  { player: 'Ivan', score: 700, date: '2024-06-02' },
+  { player: 'Judy', score: 600, date: '2024-06-01' },
+  { player: 'Mallory', score: 500, date: '2024-05-31' },
+  { player: 'Oscar', score: 400, date: '2024-05-30' },
+];
+
+const containerStyle = {
+  display: 'flex',
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+
+};
+
+const headerStyle = {
+  margin: '10px',
+};
+
+const canvasStyle = {
+  margin: '10px',
+  border: '1px solid #ddd',
+  borderRadius: '8px',
+};
+
+const leaderboardStyle = {
+  margin: '10px',
+  padding: '20px',
+  border: '1px solid #ddd',
+  borderRadius: '8px',
+  boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+  backgroundColor: '#f9f9f9',
+};
+
+const leaderboardHeaderStyle = {
+  marginBottom: '10px',
+  fontSize: '1.2em',
+  borderBottom: '2px solid #ddd',
+  paddingBottom: '5px',
+};
+
+const playerStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  padding: '5px 0',
+  borderBottom: '1px solid #eee',
+};
+
+const playerNameStyle = {
+  fontWeight: 'bold',
+};
+
+const playerScoreStyle = {
+  color: '#666',
+};
 interface Props {
   user_id: string;
 }
+
+const sectionStyle = {
+  margin: '10px',
+  padding: '20px',
+  border: '1px solid #ddd',
+  borderRadius: '8px',
+  boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+  backgroundColor: '#f9f9f9',
+};
+
+const sectionHeaderStyle = {
+  marginBottom: '10px',
+  fontSize: '1.2em',
+  borderBottom: '2px solid #ddd',
+  paddingBottom: '5px',
+};
 
 const Game: React.FC<Props> = ({ user_id }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -33,6 +114,8 @@ const Game: React.FC<Props> = ({ user_id }) => {
   const [userInfo, setUserInfo] = useState("");  
   const [username, setUsername] = useState("");
   const [userId, setUserId] = useState("");
+  const [showAllLeaderboard, setShowAllLeaderboard] = useState(false);
+  const [showAllRecentCompletions, setShowAllRecentCompletions] = useState(false);
 
 
   const loadRegions = async () => {
@@ -300,11 +383,57 @@ const Game: React.FC<Props> = ({ user_id }) => {
 
   return (
     <div>
-      <canvas
-        ref={canvasRef}
-        width={scale}
-        height={scale}
-      />
+      <div style={{display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center'}}>
+        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+          <div style={sectionStyle}>
+            <div style={sectionHeaderStyle}>Profile</div>
+            {/* Add content for profile here */}
+          </div>
+          <div style={sectionStyle}>
+            <div style={sectionHeaderStyle}>Cover Info</div>
+            {/* Add content for cover info here */}
+          </div>
+        </div>
+        <div>
+          <canvas 
+            ref={canvasRef}
+            width={scale}
+            height={scale}
+            style={canvasStyle}
+          />
+        </div>
+        <div style={{display: 'flex', flexDirection: 'column'}}>
+          <div style={sectionStyle}>
+            <div style={sectionHeaderStyle}>Leaderboard</div>
+            {(showAllLeaderboard ? leaderboardData : leaderboardData.slice(0, 5)).map((player) => (
+              <div key={player.rank} style={playerStyle}>
+                <div>{player.rank}. <span style={playerNameStyle}>{player.name}</span></div>
+                <div style={playerScoreStyle}>{player.score}</div>
+              </div>
+            ))}
+            <button 
+              onClick={() => setShowAllLeaderboard(!showAllLeaderboard)}
+            >
+              {showAllLeaderboard ? 'View Less' : 'View More'}
+            </button>
+          </div>
+          <div style={sectionStyle}>
+            <div style={sectionHeaderStyle}>Most Recent Completions</div>
+            {(showAllRecentCompletions ? recentCompletions : recentCompletions.slice(0, 5)).map((completion, index) => (
+              <div key={index} style={playerStyle}>
+                <div><span style={playerNameStyle}>{completion.player}</span></div>
+                <div style={playerScoreStyle}>{completion.score}</div>
+                <div style={{ color: '#666' }}>{completion.date}</div>
+              </div>
+            ))}
+            <button 
+              onClick={() => setShowAllRecentCompletions(!showAllRecentCompletions)}
+            >
+              {showAllRecentCompletions ? 'View Less' : 'View More'}
+            </button>
+          </div>
+        </div>
+      </div>
       <div style={{ position: 'fixed', top: '10px', left: '80px' }}>
         <button
           style={{
@@ -335,7 +464,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
             }
           }}
         >
-          Complete Cover
+        Complete Cover
         </button>
       </div>
     </div>
