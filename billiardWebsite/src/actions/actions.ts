@@ -86,13 +86,12 @@ export async function getRegionsWithCorners() {
     }
 }
 
-
-export async function getCoversFromRegionWithCorners (region_id:number) {
+export async function getCoversWithCorners () {
     let client;
     try {
         client = await pool.connect();
         await client.query('SET search_path TO kaiden');
-        const query =   `SELECT 
+        const query =  `SELECT 
                             covers.id AS cover_id, 
                             covers.points AS cover_points, 
                             JSON_AGG((cornerx, cornery) ORDER BY position) AS corners,
@@ -104,51 +103,14 @@ export async function getCoversFromRegionWithCorners (region_id:number) {
                             covers
                         JOIN 
                             has_corner ON covers.id = has_corner.cover_id
-                        JOIN 
-                            cover_in_region ON covers.id = cover_in_region.cover_id
                         LEFT JOIN 
                             (SELECT cover_id, username, info 
                             FROM user_completed_cover
                             JOIN users ON user_completed_cover.user_id = users.id) AS claimant 
                         ON 
                             covers.id = claimant.cover_id
-                        WHERE 
-                            cover_in_region.region_id = $1
                         GROUP BY 
                             covers.id, covers.points, claimant.username, claimant.info
-                        ORDER BY 
-                            covers.id;`;
-        
-        const result = await client.query(query, [region_id]);
-        return result.rows;
-    } catch (error) {
-        console.error('Error fetching covers from region with corners:', error);
-        throw error; // Rethrow the error to be handled by the caller
-    } finally {
-        if (client) {
-            client.release(); // Release the client back to the pool
-        }
-    }
-
-}
-
-export async function getCoversWithCorners () {
-    let client;
-    try {
-        client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
-        const query = `SELECT 
-                            covers.id AS cover_id, 
-                            covers.points AS cover_points, 
-                            JSON_AGG((cornerx, cornery) ORDER BY position) AS corners,
-                            EXISTS (SELECT * FROM user_claimed_cover WHERE cover_id = covers.id) AS claimed,
-                            EXISTS (SELECT * FROM user_completed_cover WHERE cover_id = covers.id) AS completed
-                        FROM 
-                            covers
-                        JOIN 
-                            has_corner ON covers.id = has_corner.cover_id
-                        GROUP BY 
-                            covers.id, covers.points
                         ORDER BY 
                             covers.id;`;
         

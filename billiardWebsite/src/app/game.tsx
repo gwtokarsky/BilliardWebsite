@@ -102,38 +102,35 @@ const Game: React.FC<Props> = ({ user_id }) => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [scale, setScale] = useState(500);
-  const [renderFlag, setRenderFlag] = useState(false);
   const [translate, setTranslate] = useState([0, 0]);
   const [polygons, setPolygons] = useState<Polygon[]>([]);
   const [selectedCover, setSelectedCover] = useState(null);
-  const [selectedCorners, setSelectedCorners] = useState([]);
-  const [selectedPoints, setSelectedPoints] = useState(0);
-  const [isSelectedComplete, setIsSelectedComplete] = useState(false);
   const [regions, setRegions] = useState([]);
   const [covers, setCovers] = useState([]);
-  const [userInfo, setUserInfo] = useState("");  
   const [username, setUsername] = useState("");
-  const [userId, setUserId] = useState("");
   const [showAllLeaderboard, setShowAllLeaderboard] = useState(false);
   const [showAllRecentCompletions, setShowAllRecentCompletions] = useState(false);
 
 
   const loadRegions = async () => {
-    const response = await getRegionsWithCorners();
-    await setRegions(response);
-    const response2 = await getCoversWithCorners();
-    await setCovers(response2);
+    const regionLoad = await getRegionsWithCorners();
+    await setRegions(regionLoad);
+    const coverLoad = await getCoversWithCorners();
+    await setCovers(coverLoad);
   };
 
   const getRegions = async () => {
     const canvasSize = Math.min(window.innerWidth, window.innerHeight) / 1.5;
-    const p: Polygon[] = [
+
+    // Draw background polygon
+    const polygonList: Polygon[] = [
       {
         points: [[0, canvasSize], [0, 0], [canvasSize, canvasSize]],
         fillColor: 'grey',
       },
     ];
 
+    //get regions and add them to the polygon list
     regions.map(async (region: any) => {
       const corners = region.corners.map((corner: any) => [corner.f1 / 180 * canvasSize, (180 - corner.f2) / 180 * canvasSize]);  
       const polygon: Polygon = {
@@ -141,80 +138,69 @@ const Game: React.FC<Props> = ({ user_id }) => {
         fillColor: region.region_color
       };
 
-      p.push(polygon);
-      await setPolygons(p);
-      await new Promise(r => setTimeout(r, 1000));
+      polygonList.push(polygon);
     });
 
-    const ptempcomplete = [] as Polygon[];
-    const ptempclaimed = [] as Polygon[];
+    const completePolygonList = [] as Polygon[];
+    const claimedPolygonList = [] as Polygon[];
     await covers.map(async (region: any) => {
       const corners = region.corners.map((corner: any) => [corner.f1 / 180 * canvasSize, (180 - corner.f2) / 180 * canvasSize]);  
-      let s;
+      let border;
       if (region.completed) {
-        s = 'green';
+        border = 'green';
       }
       else if (region.claimed) {
-        s = 'orange';
+        border = 'orange';
       }
       else {
-        s = 'maroon';
+        border = 'maroon';
       }
       const polygon: Polygon = {
         points: corners,
-        stroke: s,
+        stroke: border,
       };
 
-      if (s === 'maroon') {
-        p.push(polygon);
+      if (border == 'maroon') {
+        polygonList.push(polygon);
       }
-      else if (s === 'orange') {
-        ptempclaimed.push(polygon);
+      else if (border == 'orange') {
+        claimedPolygonList.push(polygon);
       }
       else {
-        ptempcomplete.push(polygon);
+        completePolygonList.push(polygon);
       }
     });
 
-    for (let i = 0; i < ptempclaimed.length; i++) {
-      p.push(ptempclaimed[i]);
+    for (let i = 0; i < claimedPolygonList.length; i++) {
+      polygonList.push(claimedPolygonList[i]);
     }
-    for (let i = 0; i < ptempcomplete.length; i++) {
-      p.push(ptempcomplete[i]);
+    for (let i = 0; i < completePolygonList.length; i++) {
+      polygonList.push(completePolygonList[i]);
     } 
-    await setPolygons(p);
+    await setPolygons(polygonList);
   };
 
   const findContainingCover = async (x: number, y: number) => {
-    const canvasSize = Math.min(window.innerWidth, window.innerHeight) / 1.5;
-    console.log(x,y)
-    const response = await getRegionsWithCorners();
-    let containing_region = null;
-    for (let i = 0; i < response.length; i++) {
-      console.log(response[i].corners)
-      const corners = response[i].corners.map((corner: any) => [corner.f1, corner.f2]);
-      console.log(corners);
-      if(d3.polygonContains(corners, [x, y])) {
-        containing_region = response[i];
-        console.log(containing_region);
-        break;
-      }
-    }
-    if (!containing_region) {
-      return null;
-    }
-    const response2 = await getCoversFromRegionWithCorners(containing_region.region_id);
-    console.log(response2);
+    // let containing_region = null;
+    // for (let i = 0; i < regions.length; i++) {
+    //   const corners = regions[i].corners.map((corner: any) => [corner.f1, corner.f2]);
+    //   if(d3.polygonContains(corners, [x, y])) {
+    //     containing_region = regions[i];
+    //     break;
+    //   }
+    // }
+    // if (!containing_region) {
+    //   return null;
+    // }
+    // const response2 = await getCoversFromRegionWithCorners(containing_region.region_id);
     let containing_cover = null;
-    for (let i = 0; i < response2.length; i++) {
-      const corners = response2[i].corners.map((corner: any) => [corner.f1, corner.f2]);
-      console.log(corners);
+    for (let i = 0; i < covers.length; i++) {
+      const corners = covers[i].corners.map((corner: any) => [corner.f1, corner.f2]);
       if(d3.polygonContains(corners, [x, y])) {
-        containing_cover = response2[i];
+        containing_cover = covers[i];
         break;
       }
     }
-    console.log(containing_cover);
     return containing_cover;
   };
 
@@ -233,8 +219,8 @@ const Game: React.FC<Props> = ({ user_id }) => {
         const relativeY = e.clientY - rect.top;
 
         // Adjust mouse position based on scale factor
-        const adjustedX = (relativeX - translate[0]) / scale * 180 / zoom;
-        const adjustedY = 180 - (relativeY - translate[1]) / scale * 180 / zoom;
+        const adjustedX = (relativeX - translate[0]) / canvasSize * 180 / zoom;
+        const adjustedY = 180 - (relativeY - translate[1]) / canvasSize * 180 / zoom;
 
         setMousePosition({ 
         x: adjustedX,
@@ -253,35 +239,27 @@ const Game: React.FC<Props> = ({ user_id }) => {
     // Add event listeners when component mounts
     canvasRef.current!.addEventListener('mousemove', handleMouseMove);
     
-    if (!renderFlag) {
-      setRenderFlag(true);
-    }
     // Clean up event listeners when component unmounts
     return () => {
       canvasRef.current!.removeEventListener('mousemove', handleMouseMove);
     };
-
-
-
-
-  }, [zoom, renderFlag]); // Re-run effect when zoom changes
+  }, [zoom]); // Re-run effect when zoom changes
 
   useEffect(() => {
     getRegions();
     render();
+
+    if (!(user_id === null || user_id === undefined || user_id === '')) {
+      getUserInfo();
+    }
   }, [covers]);
 
   useEffect(() => {
-    if (!(user_id === null || user_id === undefined || user_id === '')) {
-      setUserId(user_id);
-    }
     const handleMouseClick = async (e: MouseEvent) => {
       let cover = await findContainingCover(mousePosition.x, mousePosition.y);
       if (cover !== null) {
         await setSelectedCover(cover);
         //add a button beneath the canvas that says "claim cover" and when clicked, it will set cover to claimed by the user
-
-
       }
     };
     canvasRef.current!.removeEventListener('click', handleMouseClick);
@@ -296,16 +274,13 @@ const Game: React.FC<Props> = ({ user_id }) => {
   }
   , []);
 
-  useEffect(() => {
-    async function getUserInfo() {
-      if (user_id === null || user_id === undefined || user_id === '') {
-        return;
-      }
-      const username = await getUsernameFromId(userId);
-      await setUsername(username);
+  async function getUserInfo() {
+    if (user_id === null || user_id === undefined || user_id === '') {
+      return;
     }
-    getUserInfo();
-  }, [userId]);
+    const username = await getUsernameFromId(user_id);
+    await setUsername(username);
+  }
 
   const polygonLength = (polygon: Polygon) => {
     //get maximum distance between two consecutive points
@@ -320,12 +295,8 @@ const Game: React.FC<Props> = ({ user_id }) => {
     return maxDistance;
   };
 
-  //if userId is null, check for a user id in the props
-
-
-
-
   const render = () => {
+    // Get canvas context
     const canvas = d3.select(canvasRef.current);
     canvas.style('border', '3px solid black');
     const context = canvas.node()!.getContext('2d');
@@ -333,7 +304,9 @@ const Game: React.FC<Props> = ({ user_id }) => {
     if (!context) {
       throw new Error("Could not create 2D rendering context.");
     }
-    context.clearRect(-10000, -10000, context.canvas.width * 10000, context.canvas.height * 10000);
+
+    // Clear canvas
+    context.clearRect(0, 0, context.canvas.width, context.canvas.height);
     context.save();
     context.scale(zoom, zoom);
     context.translate(translate[0] / zoom, translate[1] / zoom);
@@ -361,14 +334,11 @@ const Game: React.FC<Props> = ({ user_id }) => {
     let regex = /[\{\}\[\]:]/g
     context.font = '14px Arial';
     context.fillStyle = 'black';
+    console.log(selectedCover);
     const infoLines = [
       `X: ${mousePosition.x.toFixed(2)} ` + 
       `Y: ${mousePosition.y.toFixed(2)}`,
       `Zoom: ${zoom.toFixed(2)}`,
-      `Cover Point Count: ${(selectedCover as any) ? (selectedCover as any).cover_points : 'None'}`,
-      `Selected Cover: ${(selectedCover as any) ? JSON.stringify((selectedCover as any).corners)
-        .replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(regex, '') : 'None'}`,
-      `${(selectedCover as any) ? (selectedCover as any).info : ''}`
     ];
     infoLines.forEach((line, index) => {
       context.fillText(line, 10, 20 + index * 20);
@@ -377,9 +347,44 @@ const Game: React.FC<Props> = ({ user_id }) => {
     context.restore();
   };
 
+  const getCoverInfo = () => {
+    if (selectedCover === null) {
+      return (
+        <div>
+          <p>Points: None</p>
+          <p>Claimed: None</p>
+          <p>Completed: None</p>
+        </div>
+      );
+    }
+    return (
+      <div>
+        <p>Points: {(selectedCover as any).cover_points}</p>
+        <p>Corners: {JSON.stringify((selectedCover as any).corners)
+          .replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '')}</p>
+        <p>{(selectedCover as any).completed ? (
+            <>
+              Completed by: <br />
+              {(selectedCover as any).info}
+            </>
+          ) : (
+            <>
+              Incomplete <br />
+              <p>{(selectedCover as any).claimed ? (
+                <>
+                  Claimed by: <br />
+                  {(selectedCover as any).info}
+                </>
+              ) : 'unclaimed'}</p>
+            </>
+          )}</p>
+      </div>
+    );
+  }
+
   useEffect(() => {
     render();
-  }, [polygons, mousePosition, zoom, selectedCover]);
+  }, [zoom, selectedCover, mousePosition]);
 
   return (
     <div>
@@ -387,11 +392,22 @@ const Game: React.FC<Props> = ({ user_id }) => {
         <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Profile</div>
-            {/* Add content for profile here */}
+            <h2 style={headerStyle}>Username: {username}</h2>
+            <div style={{ marginBottom: '10px' }}>
+              <label htmlFor="newUsername">Change Info:</label><br></br>
+              <input
+                type="text"
+                id="newUsername"
+                required
+              /><br></br>
+              <button style={{ marginTop: '10px' }}>Submit Change</button>
+            </div>
+            <button style={{ marginTop: '10px' }}>Upload Completion Logo</button><br></br>
+            <button style={{ marginTop: '10px' }}>Logout</button>
           </div>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Cover Info</div>
-            {/* Add content for cover info here */}
+            {getCoverInfo()}
           </div>
         </div>
         <div>
