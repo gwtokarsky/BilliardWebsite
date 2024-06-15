@@ -26,6 +26,7 @@
     "react": "^18",
     "react-dom": "^18",
     "react-konva": "^18.2.10",
+    "react-toastify": "^10.0.5",
     "ts-node": "^10.9.2",
     "turf": "^3.0.14",
     "uuid": "^9.0.1"

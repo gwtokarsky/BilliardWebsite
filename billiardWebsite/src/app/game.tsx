@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import * as d3 from 'd3';
 import { Console } from 'console';
-import { getCoversFromRegionWithCorners, getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover} from '@/actions/actions';
+import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover, deleteAllSessionsForUser} from '@/actions/actions';
+import { ToastContainer, toast } from 'react-toastify';
 import { get } from 'http';
 
 interface Polygon {
@@ -259,7 +260,6 @@ const Game: React.FC<Props> = ({ user_id }) => {
       let cover = await findContainingCover(mousePosition.x, mousePosition.y);
       if (cover !== null) {
         await setSelectedCover(cover);
-        //add a button beneath the canvas that says "claim cover" and when clicked, it will set cover to claimed by the user
       }
     };
     canvasRef.current!.removeEventListener('click', handleMouseClick);
@@ -334,11 +334,10 @@ const Game: React.FC<Props> = ({ user_id }) => {
     let regex = /[\{\}\[\]:]/g
     context.font = '14px Arial';
     context.fillStyle = 'black';
-    console.log(selectedCover);
     const infoLines = [
       `X: ${mousePosition.x.toFixed(2)} ` + 
       `Y: ${mousePosition.y.toFixed(2)}`,
-      `Zoom: ${zoom.toFixed(2)}`,
+      `Zoom: ${(zoom > 1.001 ? "+" : "") + (zoom > 1.001 || zoom < 0.999 ? ((zoom - 1) * 100).toFixed(0).toString() + '%' : 'Default')}`,
     ];
     infoLines.forEach((line, index) => {
       context.fillText(line, 10, 20 + index * 20);
@@ -351,9 +350,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
     if (selectedCover === null) {
       return (
         <div>
-          <p>Points: None</p>
-          <p>Claimed: None</p>
-          <p>Completed: None</p>
+          <p>No Selected Cover</p>
         </div>
       );
     }
@@ -365,7 +362,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
         <p>{(selectedCover as any).completed ? (
             <>
               Completed by: <br />
-              {(selectedCover as any).info}
+              {(selectedCover as any).info ?? 'An Anonymous Hunter'}
             </>
           ) : (
             <>
@@ -373,13 +370,61 @@ const Game: React.FC<Props> = ({ user_id }) => {
               <p>{(selectedCover as any).claimed ? (
                 <>
                   Claimed by: <br />
-                  {(selectedCover as any).info}
+                  {(selectedCover as any).info ?? 'An Anonymous Hunter'}
                 </>
               ) : 'unclaimed'}</p>
+
+              <p>
+                <button
+                  onClick={async () => {
+                    if (selectedCover) {
+                      const res = await claimCover((selectedCover as any).cover_id, user_id)
+                      if (res) {
+                        //toast success
+                        toast("Claimed successfully", { type: "success" })
+                        loadRegions()
+                      }
+                      else {
+                        //toast failure
+                        toast("Claim failed", { type: "error" })  
+                      }
+                    }
+                  }}
+                >
+                  Claim
+                </button>
+                <button
+                  onClick={async () => {
+                    if (selectedCover) {
+                      const res = await completeCover((selectedCover as any).cover_id, user_id)
+
+                      if (res) {
+                        //toast success
+                        toast("Completed successfully", { type: "success" })
+                        loadRegions()
+                      }
+                      else {
+                        //toast failure
+                        toast("Completion failed", { type: "error" })
+                      }
+                    }
+                  }}
+                >
+                  Complete 
+                </button>
+              </p>
             </>
           )}</p>
       </div>
     );
+  }
+
+  const logout = () => {
+    const doLogout = async () => {
+      await deleteAllSessionsForUser(user_id);
+      window.location.href = '/login';
+    }
+    doLogout();
   }
 
   useEffect(() => {
@@ -403,11 +448,11 @@ const Game: React.FC<Props> = ({ user_id }) => {
               <button style={{ marginTop: '10px' }}>Submit Change</button>
             </div>
             <button style={{ marginTop: '10px' }}>Upload Completion Logo</button><br></br>
-            <button style={{ marginTop: '10px' }}>Logout</button>
+            <button onClick={logout} style={{ marginTop: '10px' }}>Logout</button>
           </div>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Cover Info</div>
-            {getCoverInfo()}
+            {getCoverInfo()}           
           </div>
         </div>
         <div>
@@ -451,37 +496,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
         </div>
       </div>
       <div style={{ position: 'fixed', top: '10px', left: '80px' }}>
-        <button
-          style={{
-            position: 'fixed',
-            top: `calc(${scale + 100}px)`,
-            left: `calc(50% - ${scale / 2 - 50}px)`,
-            transform: 'translateX(-50%)'
-          }}
-          onClick={async () => {
-            if (selectedCover) {
-              await claimCover((selectedCover as any).cover_id, user_id)
-            }
-          }}
-        >
-          Claim Cover
-        </button>
-        <button
-          style={{
-            position: 'fixed',
-            top: `calc(${scale + 100}px)`,
-            left: `calc(50% + ${scale / 2 - 50}px)`,
-            transform: 'translateX(-50%)'
-          }}
-
-          onClick={async () => {
-            if (selectedCover) {
-              await completeCover((selectedCover as any).cover_id, user_id)
-            }
-          }}
-        >
-        Complete Cover
-        </button>
+        
       </div>
     </div>
   );

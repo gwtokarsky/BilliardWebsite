@@ -141,6 +141,7 @@ export async function addUser(username: string, info:string, password: string) {
         // Insert the user into the database
         const query = `INSERT INTO users (username, info, password) VALUES ($1, $2, $3);`;
         await client.query(query, [username, info, hashedPassword]);
+        console.log(info);
 
         console.log('User added successfully');
     } catch (error) {
@@ -470,6 +471,23 @@ export async function completeCover(cover_id: number, user_id: string) {
     } catch (error) {
         console.error('Error completing cover:', error);
         throw error; // Rethrow the error to be handled by the caller
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function deleteAllSessionsForUser(user_id: string) {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const query = `DELETE FROM sessions WHERE user_id = $1;`;
+        await client.query(query, [user_id]);
+    } catch (error) {
+        console.error('Error deleting all sessions for user:', error);
     } finally {
         if (client) {
             client.release(); // Release the client back to the pool
