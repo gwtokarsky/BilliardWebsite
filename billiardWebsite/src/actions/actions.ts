@@ -276,19 +276,11 @@ export async function claimCover(cover_id: number, user_id:string) {
         client = await pool.connect();
         await client.query('SET search_path TO kaiden');
 
-        // Check if the user has already claimed 3 covers
+        // Check if the user has already claimed a covers
         const coversQuery = `SELECT * FROM user_claimed_cover WHERE user_id = $1;`;
         const coversRes = await client.query(coversQuery, [user_id]);
 
-        if (coversRes.rowCount >= 2) {
-            return false;
-        }
-
-        // Check if the user has already claimed the cover
-        const claimedCoverQuery = `SELECT * FROM user_claimed_cover WHERE user_id = $1 AND cover_id = $2;`;
-        const claimedCoverRes = await client.query(claimedCoverQuery, [user_id, cover_id]);
-
-        if (claimedCoverRes.rowCount >= 1) {
+        if (coversRes.rowCount >= 1) {
             return false;
         }
 
@@ -488,6 +480,31 @@ export async function deleteAllSessionsForUser(user_id: string) {
         await client.query(query, [user_id]);
     } catch (error) {
         console.error('Error deleting all sessions for user:', error);
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function getClaimedCoversForUser(user_id: string) {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const query = ` SELECT c.points, JSON_AGG((cornerx, cornery) ORDER BY position) AS corners 
+                        FROM covers c
+                        JOIN has_corner hc ON c.id = hc.cover_id
+                        JOIN user_claimed_cover ucc ON c.id = ucc.cover_id
+                        WHERE ucc.user_id = $1
+                        GROUP BY c.id;`;
+        const res = await client.query(query, [user_id]);
+
+        return res.rows;
+    } catch (error) {
+        console.error('Error getting claimed covers for user:', error);
+        return [];
     } finally {
         if (client) {
             client.release(); // Release the client back to the pool

@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import * as d3 from 'd3';
 import { Console } from 'console';
-import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover, deleteAllSessionsForUser} from '@/actions/actions';
+import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover, deleteAllSessionsForUser, getClaimedCoversForUser} from '@/actions/actions';
 import { ToastContainer, toast } from 'react-toastify';
 import { get } from 'http';
+import Modal from './modal';
 
 interface Polygon {
   points: [number, number][];
@@ -18,6 +19,29 @@ const leaderboardData = [
   { rank: 3, name: 'Charlie', score: 1300 },
   { rank: 4, name: 'David', score: 1200 },
   { rank: 5, name: 'Eve', score: 1100 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
+  { rank: 4, name: 'David', score: 1200 },
   { rank: 4, name: 'David', score: 1200 },
 ];
 
@@ -111,6 +135,11 @@ const Game: React.FC<Props> = ({ user_id }) => {
   const [username, setUsername] = useState("");
   const [showAllLeaderboard, setShowAllLeaderboard] = useState(false);
   const [showAllRecentCompletions, setShowAllRecentCompletions] = useState(false);
+  const [clamimedCovers, setClaimedCovers] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCompletionsModalOpen, setIsCompletionsModalOpen] = useState(false);
+  const [isClaimantsModalOpen, setIsClaimantsModalOpen] = useState(false);
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
 
 
   const loadRegions = async () => {
@@ -246,9 +275,15 @@ const Game: React.FC<Props> = ({ user_id }) => {
     };
   }, [zoom]); // Re-run effect when zoom changes
 
+  const setClaimedCoversFront = async () => {
+    await setClaimedCovers(await getClaimedCoversForUser(user_id));
+  }
+
+
   useEffect(() => {
     getRegions();
     render();
+    setClaimedCoversFront();
 
     if (!(user_id === null || user_id === undefined || user_id === '')) {
       getUserInfo();
@@ -369,10 +404,26 @@ const Game: React.FC<Props> = ({ user_id }) => {
               Incomplete <br />
               <p>{(selectedCover as any).claimed ? (
                 <>
-                  Claimed by: <br />
-                  {(selectedCover as any).info ?? 'An Anonymous Hunter'}
+                  <button onClick={() => setIsClaimantsModalOpen(true)}>View All Claimants</button>
                 </>
               ) : 'unclaimed'}</p>
+
+              <Modal isOpen={isClaimantsModalOpen} onClose={() => setIsClaimantsModalOpen(false)}>
+                <div>
+                  <h2>All Claimants</h2>
+                  {selectedCover.claimants?.length ? (
+                    <ul>
+                      {selectedCover.claimants.map((claimant: any) => (
+                        <li key={claimant.user_id}>
+                          {claimant.username}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No claimants found.</p>
+                  )}
+                </div>
+              </Modal>
 
               <p>
                 <button
@@ -431,6 +482,13 @@ const Game: React.FC<Props> = ({ user_id }) => {
     render();
   }, [zoom, selectedCover, mousePosition]);
 
+  const getCoverOne = () => {
+    if (clamimedCovers.length > 0) {
+      return clamimedCovers[0].points + "p - " + " Corners:" +  JSON.stringify(clamimedCovers[0].corners).replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '');
+    }
+    return 'None';
+  }
+
   return (
     <div>
       <div style={{display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center'}}>
@@ -438,6 +496,10 @@ const Game: React.FC<Props> = ({ user_id }) => {
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Profile</div>
             <h2 style={headerStyle}>Username: {username}</h2>
+            <p>Points: 0</p>
+            <p>Your Cover: {getCoverOne()}</p>
+            <p><button onClick={() => setIsEditProfileModalOpen(true)}>Edit Profile</button></p>
+            <Modal isOpen={isEditProfileModalOpen} onClose={() => setIsEditProfileModalOpen(false)}>
             <div style={{ marginBottom: '10px' }}>
               <label htmlFor="newUsername">Change Info:</label><br></br>
               <input
@@ -447,7 +509,12 @@ const Game: React.FC<Props> = ({ user_id }) => {
               /><br></br>
               <button style={{ marginTop: '10px' }}>Submit Change</button>
             </div>
-            <button style={{ marginTop: '10px' }}>Upload Completion Logo</button><br></br>
+            <div style={{ marginBottom: '10px' }}>
+              <h2>Upload Completion Logo</h2>
+              <input type="file" accept="image/*" /><br></br>
+            </div>
+          </Modal>
+            <button style={{ marginTop: '10px' }}>View Your Covers</button><br></br>
             <button onClick={logout} style={{ marginTop: '10px' }}>Logout</button>
           </div>
           <div style={sectionStyle}>
@@ -466,32 +533,48 @@ const Game: React.FC<Props> = ({ user_id }) => {
         <div style={{display: 'flex', flexDirection: 'column'}}>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Leaderboard</div>
-            {(showAllLeaderboard ? leaderboardData : leaderboardData.slice(0, 5)).map((player) => (
-              <div key={player.rank} style={playerStyle}>
-                <div>{player.rank}. <span style={playerNameStyle}>{player.name}</span></div>
-                <div style={playerScoreStyle}>{player.score}</div>
-              </div>
+            {leaderboardData.slice(0, 5).map((player) => (
+            <div key={player.rank} style={playerStyle}>
+              <div>{player.rank}. <span style={playerNameStyle}>{player.name}</span></div>
+              <div style={playerScoreStyle}>{player.score}</div>
+            </div>
             ))}
-            <button 
-              onClick={() => setShowAllLeaderboard(!showAllLeaderboard)}
-            >
-              {showAllLeaderboard ? 'View Less' : 'View More'}
+            <button onClick={() => setIsModalOpen(true)}>
+              View More
             </button>
+
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+              <h1>Leaderboard</h1>
+              {leaderboardData.map((player) => (
+                <div key={player.rank} style={playerStyle}>
+                  <div>{player.rank}. <span style={playerNameStyle}>{player.name}</span></div>
+                  <div style={playerScoreStyle}>{player.score}</div>
+                </div>
+              ))}
+            </Modal>
           </div>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Most Recent Completions</div>
-            {(showAllRecentCompletions ? recentCompletions : recentCompletions.slice(0, 5)).map((completion, index) => (
+            {recentCompletions.slice(0, 5).map((completion, index) => (
               <div key={index} style={playerStyle}>
                 <div><span style={playerNameStyle}>{completion.player}</span></div>
                 <div style={playerScoreStyle}>{completion.score}</div>
                 <div style={{ color: '#666' }}>{completion.date}</div>
               </div>
             ))}
-            <button 
-              onClick={() => setShowAllRecentCompletions(!showAllRecentCompletions)}
-            >
-              {showAllRecentCompletions ? 'View Less' : 'View More'}
+            <button onClick={() => setIsCompletionsModalOpen(true)}>
+              View More
             </button>
+
+            <Modal isOpen={isCompletionsModalOpen} onClose={() => setIsCompletionsModalOpen(false)}>
+              {recentCompletions.map((completion, index) => (
+                <div key={index} style={playerStyle}>
+                  <div><span style={playerNameStyle}>{completion.player}</span></div>
+                  <div style={playerScoreStyle}>{completion.score}</div>
+                  <div style={{ color: '#666' }}>{completion.date}</div>
+                </div>
+              ))}
+            </Modal>
           </div>
         </div>
       </div>
