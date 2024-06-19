@@ -133,7 +133,6 @@ export async function addUser(username: string, info:string, password: string) {
     try {
         client = await pool.connect();
         await client.query('SET search_path TO kaiden');
-        console.log('Adding user:', username, info, password)
 
         // Hash the password
         const hashedPassword = await hashPassword(password);
@@ -504,6 +503,127 @@ export async function getClaimedCoversForUser(user_id: string) {
         return res.rows;
     } catch (error) {
         console.error('Error getting claimed covers for user:', error);
+        return [];
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function getLeaderboard() {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const query = `SELECT username, info as name, SUM(points) AS total_points
+                        FROM users
+                        JOIN user_completed_cover ON users.id = user_completed_cover.user_id
+                        JOIN covers ON user_completed_cover.cover_id = covers.id
+                        GROUP BY username, name
+                        ORDER BY total_points DESC;`;
+        const res = await client.query(query);
+        return res.rows;
+    } catch (error) {
+        console.error('Error getting leaderboard:', error);
+        return [];
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function getMostRecentCompletionData() {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const query = `SELECT username, info as name, completion_date as date
+                        FROM users
+                        JOIN user_completed_cover ON users.id = user_completed_cover.user_id
+                        ORDER BY completion_date DESC`;
+        const res = await client.query(query);
+        return res.rows;
+    } catch (error) {
+        console.error('Error getting most recent completion data:', error);
+        return null;
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function getCompletedCoversForUser(user_id: string) {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const query = ` SELECT completion_date, c.points, JSON_AGG((cornerx, cornery) ORDER BY position) AS corners 
+                        FROM covers c
+                        JOIN has_corner hc ON c.id = hc.cover_id
+                        JOIN user_completed_cover ucc ON c.id = ucc.cover_id
+                        WHERE ucc.user_id = $1
+                        GROUP BY c.id, completion_date, c.points
+                        ORDER BY completion_date DESC;`;
+        const res = await client.query(query, [user_id]);
+        console.log(res.rows);
+        return res.rows;
+    } catch (error) {
+        console.error('Error getting completed covers for user:', error);
+        return [];
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function getUserPoints(user_id: string) {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const query = `SELECT SUM(points) AS total_points
+                        FROM user_completed_cover
+                        JOIN covers ON user_completed_cover.cover_id = covers.id
+                        WHERE user_id = $1;`;
+        const res = await client.query(query, [user_id]);
+
+        if (res.rowCount === 0) {
+            return 0;
+        }
+
+        return res.rows[0].total_points;
+    } catch (error) {
+        console.error('Error getting user points:', error);
+        return 0;
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function getAllClaimants(cover_id: number) {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const query = `SELECT username, info as name
+                        FROM users
+                        JOIN user_claimed_cover ON users.id = user_claimed_cover.user_id
+                        WHERE cover_id = $1;`;
+        const res = await client.query(query, [cover_id]);
+        return res.rows;
+    } catch (error) {
+        console.error('Error getting claimants:', error);
         return [];
     } finally {
         if (client) {

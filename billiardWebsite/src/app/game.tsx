@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import * as d3 from 'd3';
 import { Console } from 'console';
-import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover, deleteAllSessionsForUser, getClaimedCoversForUser} from '@/actions/actions';
+import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants} from '@/actions/actions';
 import { ToastContainer, toast } from 'react-toastify';
 import { get } from 'http';
 import Modal from './modal';
@@ -13,47 +13,6 @@ interface Polygon {
   fillOpacity?: number;
   stroke?: string;
 }
-const leaderboardData = [
-  { rank: 1, name: 'Alice', score: 1500 },
-  { rank: 2, name: 'Bob', score: 1400 },
-  { rank: 3, name: 'Charlie', score: 1300 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 5, name: 'Eve', score: 1100 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-  { rank: 4, name: 'David', score: 1200 },
-];
-
-const recentCompletions = [
-  { player: 'Frank', score: 1000, date: '2024-06-05' },
-  { player: 'Grace', score: 900, date: '2024-06-04' },
-  { player: 'Heidi', score: 800, date: '2024-06-03' },
-  { player: 'Ivan', score: 700, date: '2024-06-02' },
-  { player: 'Judy', score: 600, date: '2024-06-01' },
-  { player: 'Mallory', score: 500, date: '2024-05-31' },
-  { player: 'Oscar', score: 400, date: '2024-05-30' },
-];
 
 const containerStyle = {
   display: 'flex',
@@ -140,13 +99,22 @@ const Game: React.FC<Props> = ({ user_id }) => {
   const [isCompletionsModalOpen, setIsCompletionsModalOpen] = useState(false);
   const [isClaimantsModalOpen, setIsClaimantsModalOpen] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
-
+  const [leaderboardData, setLeaderboardData] = useState([]);
+  const [recentCompletions, setRecentCompletions] = useState([]);
+  const [completedCovers, setCompletedCovers] = useState([]);
+  const [isMyModalOpen, setIsMyModalOpen] = useState(false);
+  const [points, setPoints] = useState(0);
+  const [claimants, setClaimants] = useState([]);
 
   const loadRegions = async () => {
     const regionLoad = await getRegionsWithCorners();
     await setRegions(regionLoad);
     const coverLoad = await getCoversWithCorners();
     await setCovers(coverLoad);
+    const leaderboard = await getLeaderboard();
+    await setLeaderboardData(leaderboard);
+    const recentCompletions = await getMostRecentCompletionData();
+    await setRecentCompletions(recentCompletions);
   };
 
   const getRegions = async () => {
@@ -295,6 +263,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
       let cover = await findContainingCover(mousePosition.x, mousePosition.y);
       if (cover !== null) {
         await setSelectedCover(cover);
+        await handleSetClaimant(cover.cover_id);
       }
     };
     canvasRef.current!.removeEventListener('click', handleMouseClick);
@@ -315,6 +284,10 @@ const Game: React.FC<Props> = ({ user_id }) => {
     }
     const username = await getUsernameFromId(user_id);
     await setUsername(username);
+    const coversForUser = await getCompletedCoversForUser(user_id);
+    await setCompletedCovers(coversForUser);
+    const total_points = await getUserPoints(user_id);
+    await setPoints(total_points);
   }
 
   const polygonLength = (polygon: Polygon) => {
@@ -381,6 +354,12 @@ const Game: React.FC<Props> = ({ user_id }) => {
     context.restore();
   };
 
+  const handleSetClaimant = async (cover_id: string) => {
+    await getAllClaimants(cover_id).then((res) => {
+      setClaimants(res);
+    });
+  }
+
   const getCoverInfo = () => {
     if (selectedCover === null) {
       return (
@@ -404,16 +383,18 @@ const Game: React.FC<Props> = ({ user_id }) => {
               Incomplete <br />
               <p>{(selectedCover as any).claimed ? (
                 <>
-                  <button onClick={() => setIsClaimantsModalOpen(true)}>View All Claimants</button>
+                  <button onClick={() => {
+                    setIsClaimantsModalOpen(true);
+                  }}>View All Claimants</button>
                 </>
               ) : 'unclaimed'}</p>
 
               <Modal isOpen={isClaimantsModalOpen} onClose={() => setIsClaimantsModalOpen(false)}>
                 <div>
                   <h2>All Claimants</h2>
-                  {selectedCover.claimants?.length ? (
+                  {claimants?.length ? (
                     <ul>
-                      {selectedCover.claimants.map((claimant: any) => (
+                      {claimants.map((claimant: any) => (
                         <li key={claimant.user_id}>
                           {claimant.username}
                         </li>
@@ -496,7 +477,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Profile</div>
             <h2 style={headerStyle}>Username: {username}</h2>
-            <p>Points: 0</p>
+            <p>Points: {points}</p>
             <p>Your Cover: {getCoverOne()}</p>
             <p><button onClick={() => setIsEditProfileModalOpen(true)}>Edit Profile</button></p>
             <Modal isOpen={isEditProfileModalOpen} onClose={() => setIsEditProfileModalOpen(false)}>
@@ -514,8 +495,18 @@ const Game: React.FC<Props> = ({ user_id }) => {
               <input type="file" accept="image/*" /><br></br>
             </div>
           </Modal>
-            <button style={{ marginTop: '10px' }}>View Your Covers</button><br></br>
-            <button onClick={logout} style={{ marginTop: '10px' }}>Logout</button>
+          <button onClick={() => setIsMyModalOpen(true)} style={{ marginTop: '10px' }}>View Your Covers</button><br></br>
+          <Modal isOpen={isMyModalOpen} onClose={() => setIsMyModalOpen(false)}>
+            <h1>Completions</h1>
+            {completedCovers.map((cover) => (
+              <div style={playerStyle}>
+                <div><span style={playerNameStyle}>{JSON.stringify(cover.corners).replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '')}</span></div>
+                <div style={playerScoreStyle}>{cover.completion_date.toLocaleDateString()}</div>
+                <div style={playerScoreStyle}>{cover.points}</div>
+              </div>
+            ))}
+          </Modal>
+          <button onClick={logout} style={{ marginTop: '10px' }}>Logout</button>
           </div>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Cover Info</div>
@@ -534,9 +525,9 @@ const Game: React.FC<Props> = ({ user_id }) => {
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Leaderboard</div>
             {leaderboardData.slice(0, 5).map((player) => (
-            <div key={player.rank} style={playerStyle}>
-              <div>{player.rank}. <span style={playerNameStyle}>{player.name}</span></div>
-              <div style={playerScoreStyle}>{player.score}</div>
+            <div style={playerStyle}>
+              <div><span style={playerNameStyle}>{player.name}</span></div>
+              <div style={playerScoreStyle}>{player.total_points}</div>
             </div>
             ))}
             <button onClick={() => setIsModalOpen(true)}>
@@ -546,9 +537,9 @@ const Game: React.FC<Props> = ({ user_id }) => {
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
               <h1>Leaderboard</h1>
               {leaderboardData.map((player) => (
-                <div key={player.rank} style={playerStyle}>
-                  <div>{player.rank}. <span style={playerNameStyle}>{player.name}</span></div>
-                  <div style={playerScoreStyle}>{player.score}</div>
+                <div style={playerStyle}>
+                  <div><span style={playerNameStyle}>{player.name}</span></div>
+                  <div style={playerScoreStyle}>{player.total_points}</div>
                 </div>
               ))}
             </Modal>
@@ -557,9 +548,8 @@ const Game: React.FC<Props> = ({ user_id }) => {
             <div style={sectionHeaderStyle}>Most Recent Completions</div>
             {recentCompletions.slice(0, 5).map((completion, index) => (
               <div key={index} style={playerStyle}>
-                <div><span style={playerNameStyle}>{completion.player}</span></div>
-                <div style={playerScoreStyle}>{completion.score}</div>
-                <div style={{ color: '#666' }}>{completion.date}</div>
+                <div><span style={playerNameStyle}>{completion.name}</span></div>
+                <div style={{ color: '#666' }}>{completion.date.toLocaleDateString()}</div>
               </div>
             ))}
             <button onClick={() => setIsCompletionsModalOpen(true)}>
@@ -569,9 +559,8 @@ const Game: React.FC<Props> = ({ user_id }) => {
             <Modal isOpen={isCompletionsModalOpen} onClose={() => setIsCompletionsModalOpen(false)}>
               {recentCompletions.map((completion, index) => (
                 <div key={index} style={playerStyle}>
-                  <div><span style={playerNameStyle}>{completion.player}</span></div>
-                  <div style={playerScoreStyle}>{completion.score}</div>
-                  <div style={{ color: '#666' }}>{completion.date}</div>
+                  <div><span style={playerNameStyle}>{completion.name}</span></div>
+                  <div style={{ color: '#666' }}>{completion.date.toLocaleDateString()}</div>
                 </div>
               ))}
             </Modal>
