@@ -22,7 +22,6 @@ export async function getUsers() {
         await client.query('SET search_path TO kaiden');
         await client.query("INSERT INTO users (password, info, total_points) VALUES ('Alice', 'kaiden', 0);");
         const res = await client.query('SELECT * FROM users;');
-        console.log(res.rows);
     } catch (error) {
         console.error('Error fetching users:', error);
         throw error; // Rethrow the error to be handled by the caller
@@ -98,19 +97,20 @@ export async function getCoversWithCorners () {
                             EXISTS (SELECT 1 FROM user_claimed_cover WHERE cover_id = covers.id) AS claimed,
                             EXISTS (SELECT 1 FROM user_completed_cover WHERE cover_id = covers.id) AS completed,
                             claimant.username,
-                            claimant.info
+                            claimant.info,
+                            claimant.logo
                         FROM 
                             covers
                         JOIN 
                             has_corner ON covers.id = has_corner.cover_id
                         LEFT JOIN 
-                            (SELECT cover_id, username, info 
+                            (SELECT cover_id, username, info, logo 
                             FROM user_completed_cover
-                            JOIN users ON user_completed_cover.user_id = users.id) AS claimant 
+                            JOIN users ON user_completed_cover.user_id = users.id) AS claimant
                         ON 
                             covers.id = claimant.cover_id
                         GROUP BY 
-                            covers.id, covers.points, claimant.username, claimant.info
+                            covers.id, covers.points, claimant.username, claimant.info, claimant.logo
                         ORDER BY 
                             covers.id;`;
         
@@ -127,6 +127,27 @@ export async function getCoversWithCorners () {
 
 }
 
+export async function setLogoForUser(user_id: string, logo: string) {
+    let client;
+    //validate session cookie
+    if (!await validateSessionCookie(user_id)) {
+        return false;
+    }
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const query = `UPDATE users SET logo = $1 WHERE id = $2;`;
+        await client.query(query, [logo, user_id]);
+    } catch (error) {
+        console.error('Error setting logo for user:', error);
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
 
 export async function addUser(username: string, info:string, password: string) {
     let client;
@@ -140,7 +161,6 @@ export async function addUser(username: string, info:string, password: string) {
         // Insert the user into the database
         const query = `INSERT INTO users (username, info, password) VALUES ($1, $2, $3);`;
         await client.query(query, [username, info, hashedPassword]);
-        console.log(info);
 
         console.log('User added successfully');
     } catch (error) {
@@ -307,7 +327,6 @@ async function validateSessionCookie(user_id: string) {
 
         const cookieStore = cookies();
         const session_cookie = cookieStore.get('session_token');
-        console.log('Session cookie:', session_cookie);
         if (!session_cookie || session_cookie === undefined || session_cookie === null) {
             console.log('No session cookie found');
             return false;
@@ -571,7 +590,6 @@ export async function getCompletedCoversForUser(user_id: string) {
                         GROUP BY c.id, completion_date, c.points
                         ORDER BY completion_date DESC;`;
         const res = await client.query(query, [user_id]);
-        console.log(res.rows);
         return res.rows;
     } catch (error) {
         console.error('Error getting completed covers for user:', error);

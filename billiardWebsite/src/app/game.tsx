@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import * as d3 from 'd3';
 import { Console } from 'console';
-import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants} from '@/actions/actions';
+import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants, setLogoForUser} from '@/actions/actions';
 import { ToastContainer, toast } from 'react-toastify';
 import { get } from 'http';
 import Modal from './modal';
@@ -12,6 +12,7 @@ interface Polygon {
   fillColor?: string;
   fillOpacity?: number;
   stroke?: string;
+  image?: any;
 }
 
 const containerStyle = {
@@ -90,11 +91,11 @@ const Game: React.FC<Props> = ({ user_id }) => {
   const [polygons, setPolygons] = useState<Polygon[]>([]);
   const [selectedCover, setSelectedCover] = useState(null);
   const [regions, setRegions] = useState([]);
-  const [covers, setCovers] = useState([]);
+  const [covers, setCovers] = useState<any>([]);
   const [username, setUsername] = useState("");
   const [showAllLeaderboard, setShowAllLeaderboard] = useState(false);
   const [showAllRecentCompletions, setShowAllRecentCompletions] = useState(false);
-  const [clamimedCovers, setClaimedCovers] = useState([]);
+  const [clamimedCovers, setClaimedCovers] = useState<any>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCompletionsModalOpen, setIsCompletionsModalOpen] = useState(false);
   const [isClaimantsModalOpen, setIsClaimantsModalOpen] = useState(false);
@@ -105,6 +106,40 @@ const Game: React.FC<Props> = ({ user_id }) => {
   const [isMyModalOpen, setIsMyModalOpen] = useState(false);
   const [points, setPoints] = useState(0);
   const [claimants, setClaimants] = useState([]);
+  const [selectedImage, setSelectedImage] = useState("");
+  const [imageElement, setImageElement] = useState<HTMLImageElement | null>(null);
+
+  const handleFileChange = (event: any) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader: FileReader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage((reader.result as string) || ""); // Provide a default value for setSelectedImage
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const loadImage = (src: string) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  };
+
+  useEffect(() => {
+    if (selectedImage) {
+      // Load the image when selectedImage changes
+      loadImage(selectedImage).then(img => {
+        setImageElement(img as HTMLImageElement); // Update the type of setImageElement
+      }).catch(error => {
+        console.error("Error loading image:", error);
+      });
+    }
+  }, [selectedImage]);
+
 
   const loadRegions = async () => {
     const regionLoad = await getRegionsWithCorners();
@@ -141,9 +176,10 @@ const Game: React.FC<Props> = ({ user_id }) => {
 
     const completePolygonList = [] as Polygon[];
     const claimedPolygonList = [] as Polygon[];
-    await covers.map(async (region: any) => {
+    await Promise.all(await covers.map(async (region: any) => {
       const corners = region.corners.map((corner: any) => [corner.f1 / 180 * canvasSize, (180 - corner.f2) / 180 * canvasSize]);  
       let border;
+      let img;
       if (region.completed) {
         border = 'green';
       }
@@ -153,21 +189,36 @@ const Game: React.FC<Props> = ({ user_id }) => {
       else {
         border = 'maroon';
       }
-      const polygon: Polygon = {
-        points: corners,
-        stroke: border,
-      };
 
-      if (border == 'maroon') {
-        polygonList.push(polygon);
-      }
-      else if (border == 'orange') {
-        claimedPolygonList.push(polygon);
+      
+      
+      let polygon: Polygon 
+      
+      if(region.logo != null && region.logo != undefined && region.logo != "") {
+        img = await loadImage(region.logo);
+        polygon = {
+          points: corners,
+          stroke: border,
+          image: img
+        };
       }
       else {
-        completePolygonList.push(polygon);
+        polygon = {
+          points: corners,
+          stroke: border,
+        };
       }
-    });
+
+      if (border == 'maroon') {
+        await polygonList.push(polygon);
+      }
+      else if (border == 'orange') {
+        await claimedPolygonList.push(polygon);
+      }
+      else {
+        await completePolygonList.push(polygon);
+      }
+    }));
 
     for (let i = 0; i < claimedPolygonList.length; i++) {
       polygonList.push(claimedPolygonList[i]);
@@ -319,10 +370,9 @@ const Game: React.FC<Props> = ({ user_id }) => {
     context.scale(zoom, zoom);
     context.translate(translate[0] / zoom, translate[1] / zoom);
 
-    // Draw polygons
     polygons.forEach(polygon => {
       context.beginPath();
-      context.moveTo((polygon.points[0][0]), polygon.points[0][1]);
+      context.moveTo(polygon.points[0][0], polygon.points[0][1]);
       polygon.points.slice(1).forEach(point => {
         context.lineTo(point[0], point[1]);
       });
@@ -333,6 +383,46 @@ const Game: React.FC<Props> = ({ user_id }) => {
       context.stroke();
       context.globalAlpha = polygon.fillOpacity ?? 1;
       context.fill();
+    
+      // Check if it's a 4-point polygon and there's a selected image)
+      if (polygon.points.length === 4 && polygon.image !== null && polygon.image !== undefined) {
+        // Calculate dimensions of the polygon
+        const width = polygon.points[2][0] - polygon.points[0][0];
+        const height = polygon.points[2][1] - polygon.points[0][1];
+    
+        // Calculate scaling factors to fit image within polygon
+        const scaleX = width / polygon.image.width;
+        const scaleY = height / polygon.image.height;
+        const scale = Math.min(scaleX, scaleY);
+    
+        // Calculate center position of the polygon
+        const centerX:any = d3.mean(polygon.points.map(point => point[0]));
+        const centerY:any = d3.mean(polygon.points.map(point => point[1]));
+    
+        // Calculate position to center the image
+        
+        const offsetX = centerX - (polygon.image.width * scale) / 2;
+        const offsetY = centerY - (polygon.image.height * scale) / 2;
+    
+        // Save the current context state before clipping
+        context.save();
+        // Set the clipping path to the polygon
+        context.beginPath();
+        context.moveTo(polygon.points[0][0], polygon.points[0][1]);
+        polygon.points.slice(1).forEach(point => {
+          context.lineTo(point[0], point[1]);
+        });
+        context.closePath();
+        context.clip();
+    
+        // Apply transformations
+        context.translate(offsetX, offsetY);
+        context.scale(scale, scale);
+        context.drawImage(polygon.image, 0, 0);
+    
+        // Restore the context to remove the clipping path
+        context.restore();
+      }
     });
 
     // Reset transformations to draw fixed text
@@ -354,7 +444,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
     context.restore();
   };
 
-  const handleSetClaimant = async (cover_id: string) => {
+  const handleSetClaimant = async (cover_id: number) => {
     await getAllClaimants(cover_id).then((res) => {
       setClaimants(res);
     });
@@ -470,6 +560,12 @@ const Game: React.FC<Props> = ({ user_id }) => {
     return 'None';
   }
 
+  const handleSubmitChange = async () => {
+    const newInfo = (document.getElementById('newInfo') as HTMLInputElement).value;
+    await setLogoForUser(user_id, selectedImage);
+    window.location.reload();
+  }
+
   return (
     <div>
       <div style={{display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center'}}>
@@ -481,32 +577,38 @@ const Game: React.FC<Props> = ({ user_id }) => {
             <p>Your Cover: {getCoverOne()}</p>
             <p><button onClick={() => setIsEditProfileModalOpen(true)}>Edit Profile</button></p>
             <Modal isOpen={isEditProfileModalOpen} onClose={() => setIsEditProfileModalOpen(false)}>
-            <div style={{ marginBottom: '10px' }}>
-              <label htmlFor="newUsername">Change Info:</label><br></br>
-              <input
-                type="text"
-                id="newUsername"
-                required
-              /><br></br>
-              <button style={{ marginTop: '10px' }}>Submit Change</button>
-            </div>
-            <div style={{ marginBottom: '10px' }}>
-              <h2>Upload Completion Logo</h2>
-              <input type="file" accept="image/*" /><br></br>
-            </div>
-          </Modal>
-          <button onClick={() => setIsMyModalOpen(true)} style={{ marginTop: '10px' }}>View Your Covers</button><br></br>
-          <Modal isOpen={isMyModalOpen} onClose={() => setIsMyModalOpen(false)}>
-            <h1>Completions</h1>
-            {completedCovers.map((cover) => (
-              <div style={playerStyle}>
-                <div><span style={playerNameStyle}>{JSON.stringify(cover.corners).replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '')}</span></div>
-                <div style={playerScoreStyle}>{cover.completion_date.toLocaleDateString()}</div>
-                <div style={playerScoreStyle}>{cover.points}</div>
+              <div style={{ marginBottom: '10px' }}>
+                <label htmlFor="newUsername">Change Info:</label><br />
+                <input
+                  type="text"
+                  id="newInfo"
+                  required
+                /><br />
               </div>
-            ))}
-          </Modal>
-          <button onClick={logout} style={{ marginTop: '10px' }}>Logout</button>
+              <div style={{ marginBottom: '10px' }}>
+                <h2>Upload Completion Logo</h2>
+                <input type="file" accept="image/*" onChange={handleFileChange} /><br />
+              </div>
+              {selectedImage && (
+                <div style={{ marginBottom: '10px' }}>
+                  <h3>Selected Image:</h3>
+                  <img src={selectedImage} alt="Selected" style={{ maxWidth: '100%', maxHeight: '300px' }} />
+                </div>
+              )}
+              <button style={{ marginTop: '10px' }} onClick={handleSubmitChange}>Submit Change</button>
+            </Modal>
+            <button onClick={() => setIsMyModalOpen(true)} style={{ marginTop: '10px' }}>View Your Covers</button><br></br>
+            <Modal isOpen={isMyModalOpen} onClose={() => setIsMyModalOpen(false)}>
+              <h1>Completions</h1>
+              {completedCovers.map((cover:any) => (
+                <div style={playerStyle}>
+                  <div><span style={playerNameStyle}>{JSON.stringify(cover.corners).replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '')}</span></div>
+                  <div style={playerScoreStyle}>{cover.completion_date.toLocaleDateString()}</div>
+                  <div style={playerScoreStyle}>{cover.points}</div>
+                </div>
+              ))}
+            </Modal>
+            <button onClick={logout} style={{ marginTop: '10px' }}>Logout</button>
           </div>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Cover Info</div>
@@ -524,7 +626,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
         <div style={{display: 'flex', flexDirection: 'column'}}>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Leaderboard</div>
-            {leaderboardData.slice(0, 5).map((player) => (
+            {leaderboardData.slice(0, 5).map((player:any) => (
             <div style={playerStyle}>
               <div><span style={playerNameStyle}>{player.name}</span></div>
               <div style={playerScoreStyle}>{player.total_points}</div>
@@ -536,7 +638,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
               <h1>Leaderboard</h1>
-              {leaderboardData.map((player) => (
+              {leaderboardData.map((player:any) => (
                 <div style={playerStyle}>
                   <div><span style={playerNameStyle}>{player.name}</span></div>
                   <div style={playerScoreStyle}>{player.total_points}</div>
@@ -546,7 +648,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
           </div>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Most Recent Completions</div>
-            {recentCompletions.slice(0, 5).map((completion, index) => (
+            {recentCompletions.slice(0, 5).map((completion:any, index) => (
               <div key={index} style={playerStyle}>
                 <div><span style={playerNameStyle}>{completion.name}</span></div>
                 <div style={{ color: '#666' }}>{completion.date.toLocaleDateString()}</div>
@@ -557,7 +659,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
             </button>
 
             <Modal isOpen={isCompletionsModalOpen} onClose={() => setIsCompletionsModalOpen(false)}>
-              {recentCompletions.map((completion, index) => (
+              {recentCompletions.map((completion:any, index) => (
                 <div key={index} style={playerStyle}>
                   <div><span style={playerNameStyle}>{completion.name}</span></div>
                   <div style={{ color: '#666' }}>{completion.date.toLocaleDateString()}</div>
@@ -575,3 +677,4 @@ const Game: React.FC<Props> = ({ user_id }) => {
 };
 
 export default Game;
+
