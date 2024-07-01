@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import * as d3 from 'd3';
 import { Console } from 'console';
-import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants, setLogoForUser} from '@/actions/actions';
+import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants, setLogoForUser, updateInfoForUser, getInfoForUser, getLogoForUser} from '@/actions/actions';
 import { ToastContainer, toast } from 'react-toastify';
 import { get } from 'http';
 import Modal from './modal';
@@ -107,14 +107,15 @@ const Game: React.FC<Props> = ({ user_id }) => {
   const [points, setPoints] = useState(0);
   const [claimants, setClaimants] = useState([]);
   const [selectedImage, setSelectedImage] = useState("");
-  const [imageElement, setImageElement] = useState<HTMLImageElement | null>(null);
+  const [userIdTryCount, setUserIdTryCount] = useState(0);
+  const [newInfo, setNewInfo] = useState("");
 
   const handleFileChange = (event: any) => {
     const file = event.target.files[0];
     if (file) {
       const reader: FileReader = new FileReader();
       reader.onloadend = () => {
-        setSelectedImage((reader.result as string) || ""); // Provide a default value for setSelectedImage
+        setSelectedImage((reader.result as string)); // Provide a default value for setSelectedImage
       };
       reader.readAsDataURL(file);
     }
@@ -128,17 +129,6 @@ const Game: React.FC<Props> = ({ user_id }) => {
       img.src = src;
     });
   };
-
-  useEffect(() => {
-    if (selectedImage) {
-      // Load the image when selectedImage changes
-      loadImage(selectedImage).then(img => {
-        setImageElement(img as HTMLImageElement); // Update the type of setImageElement
-      }).catch(error => {
-        console.error("Error loading image:", error);
-      });
-    }
-  }, [selectedImage]);
 
 
   const loadRegions = async () => {
@@ -304,8 +294,13 @@ const Game: React.FC<Props> = ({ user_id }) => {
     render();
     setClaimedCoversFront();
 
+    setUserIdTryCount(userIdTryCount + 1);
     if (!(user_id === null || user_id === undefined || user_id === '')) {
       getUserInfo();
+    }
+    else if (userIdTryCount >= 2) {
+      //go to login
+      window.location.href = '/login';
     }
   }, [covers]);
 
@@ -330,15 +325,16 @@ const Game: React.FC<Props> = ({ user_id }) => {
   , []);
 
   async function getUserInfo() {
-    if (user_id === null || user_id === undefined || user_id === '') {
-      return;
-    }
     const username = await getUsernameFromId(user_id);
     await setUsername(username);
     const coversForUser = await getCompletedCoversForUser(user_id);
     await setCompletedCovers(coversForUser);
     const total_points = await getUserPoints(user_id);
     await setPoints(total_points);
+    const info = await getInfoForUser(user_id);
+    await setNewInfo(info);
+    const logo = await getLogoForUser(user_id);
+    await setSelectedImage(logo);
   }
 
   const polygonLength = (polygon: Polygon) => {
@@ -518,7 +514,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
                 <button
                   onClick={async () => {
                     if (selectedCover) {
-                      const res = await completeCover((selectedCover as any).cover_id, user_id)
+                      const res = await completeCoverRequest((selectedCover as any).cover_id, user_id)
 
                       if (res) {
                         //toast success
@@ -561,7 +557,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
   }
 
   const handleSubmitChange = async () => {
-    const newInfo = (document.getElementById('newInfo') as HTMLInputElement).value;
+    await updateInfoForUser(user_id, newInfo);
     await setLogoForUser(user_id, selectedImage);
     window.location.reload();
   }
@@ -578,16 +574,19 @@ const Game: React.FC<Props> = ({ user_id }) => {
             <p><button onClick={() => setIsEditProfileModalOpen(true)}>Edit Profile</button></p>
             <Modal isOpen={isEditProfileModalOpen} onClose={() => setIsEditProfileModalOpen(false)}>
               <div style={{ marginBottom: '10px' }}>
-                <label htmlFor="newUsername">Change Info:</label><br />
+                <label htmlFor="newInfo">Change Info:</label><br />
                 <input
                   type="text"
                   id="newInfo"
+                  name="newInfo"
+                  value={newInfo}
+                  onChange={(e) => setNewInfo(e.target.value)}
                   required
                 /><br />
               </div>
               <div style={{ marginBottom: '10px' }}>
                 <h2>Upload Completion Logo</h2>
-                <input type="file" accept="image/*" onChange={handleFileChange} /><br />
+                <input type="file" accept="image/*" onChange={handleFileChange} required />
               </div>
               {selectedImage && (
                 <div style={{ marginBottom: '10px' }}>

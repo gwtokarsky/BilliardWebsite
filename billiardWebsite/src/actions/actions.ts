@@ -456,7 +456,7 @@ export async function isComplete(cover_id: number) {
     }
 }
 
-export async function completeCover(cover_id: number, user_id: string) {
+export async function completeCoverRequest(cover_id: number, user_id: string) {
     if (!await validateSessionCookie(user_id)) {
         return false;
     }
@@ -466,7 +466,7 @@ export async function completeCover(cover_id: number, user_id: string) {
         await client.query('SET search_path TO kaiden');
 
         // Check if the user has already completed the cover
-        const completedCoverQuery = `SELECT * FROM user_completed_cover WHERE user_id = $1 AND cover_id = $2;`;
+        const completedCoverQuery = `SELECT * FROM user_completed_cover WHERE cover_id = $2;`;
         const completedCoverRes = await client.query(completedCoverQuery, [user_id, cover_id]);
 
         if (completedCoverRes.rowCount >= 1) {
@@ -643,6 +643,75 @@ export async function getAllClaimants(cover_id: number) {
     } catch (error) {
         console.error('Error getting claimants:', error);
         return [];
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function updateInfoForUser(user_id: string, info: string) {
+    if (!await validateSessionCookie(user_id)) {
+        return false;
+    }
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const query = `UPDATE users SET info = $1 WHERE id = $2;`;
+        await client.query(query, [info, user_id]);
+    } catch (error) {
+        console.error('Error updating info for user:', error);
+        return false;
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function getLogoForUser(user_id: string) {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const query = `SELECT logo FROM users WHERE id = $1;`;
+        const res = await client.query(query, [user_id]);
+
+        if (res.rowCount === 0) {
+            return null;
+        }
+
+        return res.rows[0].logo;
+    } catch (error) {
+        console.error('Error getting logo for user:', error);
+        return null;
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function getInfoForUser(user_id: string) {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const query = `SELECT info FROM users WHERE id = $1;`;
+        const res = await client.query(query, [user_id]);
+
+        if (res.rowCount === 0) {
+            return null;
+        }
+
+        return res.rows[0].info;
+    } catch (error) {
+        console.error('Error getting info for user:', error);
+        return null;
     } finally {
         if (client) {
             client.release(); // Release the client back to the pool
