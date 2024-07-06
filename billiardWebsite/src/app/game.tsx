@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import * as d3 from 'd3';
 import { Console } from 'console';
-import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, completeCover, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants, setLogoForUser, updateInfoForUser, getInfoForUser, getLogoForUser} from '@/actions/actions';
+import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants, setLogoForUser, updateInfoForUser, getInfoForUser, getLogoForUser, getUserIdFromCookie} from '@/actions/actions';
 import { ToastContainer, toast } from 'react-toastify';
 import { get } from 'http';
 import Modal from './modal';
@@ -39,6 +39,30 @@ const leaderboardStyle = {
   borderRadius: '8px',
   boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
   backgroundColor: '#f9f9f9',
+};
+
+const buttonStyle = {
+  marginTop: '15px',
+  padding: '2px 5px',
+  borderRadius: '4px',
+  border: 'none',
+  backgroundColor: '#6c757d',
+  color: '#fff',
+  cursor: 'pointer',
+  width: 'auto',
+  fontSize: '12px',
+};
+
+const redButtonStyle = {
+  marginTop: '15px',
+  padding: '2px 5px',
+  borderRadius: '4px',
+  border: 'none',
+  backgroundColor: 'maroon',
+  color: '#fff',
+  cursor: 'pointer',
+  width: 'auto',
+  fontSize: '12px',
 };
 
 const leaderboardHeaderStyle = {
@@ -82,7 +106,7 @@ const sectionHeaderStyle = {
   paddingBottom: '5px',
 };
 
-const Game: React.FC<Props> = ({ user_id }) => {
+const Game: React.FC<Props> = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -109,6 +133,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
   const [selectedImage, setSelectedImage] = useState("");
   const [userIdTryCount, setUserIdTryCount] = useState(0);
   const [newInfo, setNewInfo] = useState("");
+  const [userId, setUserId] = useState("");
 
   const handleFileChange = (event: any) => {
     const file = event.target.files[0];
@@ -285,7 +310,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
   }, [zoom]); // Re-run effect when zoom changes
 
   const setClaimedCoversFront = async () => {
-    await setClaimedCovers(await getClaimedCoversForUser(user_id));
+    await setClaimedCovers(await getClaimedCoversForUser(userId));
   }
 
 
@@ -295,13 +320,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
     setClaimedCoversFront();
 
     setUserIdTryCount(userIdTryCount + 1);
-    if (!(user_id === null || user_id === undefined || user_id === '')) {
-      getUserInfo();
-    }
-    else if (userIdTryCount >= 2) {
-      //go to login
-      window.location.href = '/login';
-    }
+    getUserInfo();
   }, [covers]);
 
   useEffect(() => {
@@ -325,6 +344,11 @@ const Game: React.FC<Props> = ({ user_id }) => {
   , []);
 
   async function getUserInfo() {
+    const user_id = await getUserIdFromCookie();
+    if (user_id === null) {
+      window.location.href = '/login';
+    }
+    await setUserId(user_id);
     const username = await getUsernameFromId(user_id);
     await setUsername(username);
     const coversForUser = await getCompletedCoversForUser(user_id);
@@ -427,14 +451,20 @@ const Game: React.FC<Props> = ({ user_id }) => {
     context.setTransform(1, 0, 0, 1, 0, 0); // Reset transformation matrix
     let regex = /[\{\}\[\]:]/g
     context.font = '14px Arial';
-    context.fillStyle = 'black';
+    context.fillStyle = 'gold'; // Set the fill color to gold
+    context.strokeStyle = 'black'; // Set the stroke color to black
+    context.lineWidth = 3; // Set the outline width
+
     const infoLines = [
       `X: ${mousePosition.x.toFixed(2)} ` + 
       `Y: ${mousePosition.y.toFixed(2)}`,
       `Zoom: ${(zoom > 1.001 ? "+" : "") + (zoom > 1.001 || zoom < 0.999 ? ((zoom - 1) * 100).toFixed(0).toString() + '%' : 'Default')}`,
     ];
+
     infoLines.forEach((line, index) => {
-      context.fillText(line, 10, 20 + index * 20);
+      const y = 20 + index * 20;
+      context.strokeText(line, 10, y); // Draw the outline
+      context.fillText(line, 10, y); // Fill the text
     });
 
     context.restore();
@@ -467,54 +497,66 @@ const Game: React.FC<Props> = ({ user_id }) => {
           ) : (
             <>
               Incomplete <br />
-              <p>{(selectedCover as any).claimed ? (
-                <>
-                  <button onClick={() => {
-                    setIsClaimantsModalOpen(true);
-                  }}>View All Claimants</button>
-                </>
-              ) : 'unclaimed'}</p>
-
-              <Modal isOpen={isClaimantsModalOpen} onClose={() => setIsClaimantsModalOpen(false)}>
-                <div>
-                  <h2>All Claimants</h2>
-                  {claimants?.length ? (
-                    <ul>
-                      {claimants.map((claimant: any) => (
-                        <li key={claimant.user_id}>
-                          {claimant.username}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p>No claimants found.</p>
-                  )}
-                </div>
-              </Modal>
-
+              <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center'}}>
               <p>
+                  <button
+                    style={buttonStyle}
+                    onClick={async () => {
+                      if (selectedCover) {
+                        const res = await claimCover((selectedCover as any).cover_id, userId)
+                        if (res) {
+                          //toast success
+                          toast("Claimed successfully", { type: "success" })
+                          loadRegions()
+                        }
+                        else {
+                          //toast failure
+                          if (clamimedCovers.length >= 2) {
+                            toast("You have already claimed two covers", { type: "error" })
+                          }
+                          else {
+                            toast("You have already claimed this cover", { type: "error" })  
+                          }
+                        }
+                      }
+                    }}
+                  >
+                    Claim
+                  </button>
+                </p>
+                <p>{(selectedCover as any).claimed ? (
+                  <>
+                    <button style={{...buttonStyle, marginLeft: 10}} onClick={() => {
+                      setIsClaimantsModalOpen(true);
+                    }}>View All Claimants</button>
+                  </>
+                ) : <h2 style={{marginLeft: 10, marginTop: 14}}>unclaimed</h2>}</p>
+
+                <Modal isOpen={isClaimantsModalOpen} onClose={() => setIsClaimantsModalOpen(false)}>
+                  <div>
+                    <h1 style={sectionHeaderStyle}>All Claimants</h1>
+                    {claimants?.length ? (
+                      <div>
+                        {claimants.map((claimant: any) => (
+                          <div style={playerStyle}>
+                            <div><span>{claimant.username}</span></div>
+                            <div><span>{(claimant.total_points || "0") + " Total Points"}</span></div>
+                            <div><span>{claimant.date.toLocaleDateString()}</span></div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p>No claimants found.</p>
+                    )}
+                  </div>
+                </Modal>
+
+              </div>
+                {/*
                 <button
                   onClick={async () => {
                     if (selectedCover) {
-                      const res = await claimCover((selectedCover as any).cover_id, user_id)
-                      if (res) {
-                        //toast success
-                        toast("Claimed successfully", { type: "success" })
-                        loadRegions()
-                      }
-                      else {
-                        //toast failure
-                        toast("Claim failed", { type: "error" })  
-                      }
-                    }
-                  }}
-                >
-                  Claim
-                </button>
-                <button
-                  onClick={async () => {
-                    if (selectedCover) {
-                      const res = await completeCoverRequest((selectedCover as any).cover_id, user_id)
+                      const res = await completeCoverRequest((selectedCover as any).cover_id, userId)
 
                       if (res) {
                         //toast success
@@ -530,7 +572,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
                 >
                   Complete 
                 </button>
-              </p>
+                */}
             </>
           )}</p>
       </div>
@@ -539,7 +581,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
 
   const logout = () => {
     const doLogout = async () => {
-      await deleteAllSessionsForUser(user_id);
+      await deleteAllSessionsForUser(userId);
       window.location.href = '/login';
     }
     doLogout();
@@ -551,14 +593,31 @@ const Game: React.FC<Props> = ({ user_id }) => {
 
   const getCoverOne = () => {
     if (clamimedCovers.length > 0) {
-      return clamimedCovers[0].points + "p - " + " Corners:" +  JSON.stringify(clamimedCovers[0].corners).replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '');
+      return clamimedCovers[0].points + " Points"; 
+    }
+    return 'None';
+  }
+  const getCoverTwo = () => {
+    if (clamimedCovers.length > 1) {
+      return clamimedCovers[1].points + " Points"; 
     }
     return 'None';
   }
 
+  const getCoverCornersOne = () => {
+    if (clamimedCovers.length > 0) {
+      return "Corners: " +  JSON.stringify(clamimedCovers[0].corners).replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '');
+    }
+  }
+
+  const getCoverCornersTwo = () => {
+    if (clamimedCovers.length > 1) {
+      return "Corners: " +  JSON.stringify(clamimedCovers[1].corners).replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '');
+    }
+  }
   const handleSubmitChange = async () => {
-    await updateInfoForUser(user_id, newInfo);
-    await setLogoForUser(user_id, selectedImage);
+    await updateInfoForUser(userId, newInfo);
+    await setLogoForUser(userId, selectedImage);
     window.location.reload();
   }
 
@@ -567,22 +626,33 @@ const Game: React.FC<Props> = ({ user_id }) => {
       <div style={{display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center'}}>
         <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
           <div style={sectionStyle}>
-            <div style={sectionHeaderStyle}>Profile</div>
-            <h2 style={headerStyle}>Username: {username}</h2>
-            <p>Points: {points}</p>
-            <p>Your Cover: {getCoverOne()}</p>
-            <p><button onClick={() => setIsEditProfileModalOpen(true)}>Edit Profile</button></p>
+            <div style={sectionHeaderStyle}>Profile: {username}</div>
+            <p>Total Score: {points || 0} Points</p>
+            <p>Your First Cover: {getCoverOne()}</p>
+            <p>{getCoverCornersOne()}</p>
+            <p>Your Second Cover: {getCoverTwo()}</p>
+            <p>{getCoverCornersTwo()}</p>
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center'}}>
+              <p><button style={{...buttonStyle, marginRight: 10}} onClick={() => setIsEditProfileModalOpen(true)}>Edit Profile</button></p>
+              <button onClick={() => setIsMyModalOpen(true)} style={buttonStyle}>View Your Covers</button><br></br>
+            </div>
             <Modal isOpen={isEditProfileModalOpen} onClose={() => setIsEditProfileModalOpen(false)}>
               <div style={{ marginBottom: '10px' }}>
-                <label htmlFor="newInfo">Change Info:</label><br />
+                <label htmlFor="newInfo">Change Display Name:</label><br />
                 <input
                   type="text"
                   id="newInfo"
                   name="newInfo"
                   value={newInfo}
+                  style={{width: '100%',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    border: '1px solid #ccc',
+                    boxSizing: 'border-box' as 'border-box'}}
                   onChange={(e) => setNewInfo(e.target.value)}
                   required
-                /><br />
+                />
+                <p style={{ fontSize: '10px', textAlign: 'center' }}>Note: the display name will be shown on completed covers and on the leaderboard</p>
               </div>
               <div style={{ marginBottom: '10px' }}>
                 <h2>Upload Completion Logo</h2>
@@ -594,11 +664,10 @@ const Game: React.FC<Props> = ({ user_id }) => {
                   <img src={selectedImage} alt="Selected" style={{ maxWidth: '100%', maxHeight: '300px' }} />
                 </div>
               )}
-              <button style={{ marginTop: '10px' }} onClick={handleSubmitChange}>Submit Change</button>
+              <button style={{...redButtonStyle, marginTop: '10px' }} onClick={handleSubmitChange}>Submit Change</button>
             </Modal>
-            <button onClick={() => setIsMyModalOpen(true)} style={{ marginTop: '10px' }}>View Your Covers</button><br></br>
             <Modal isOpen={isMyModalOpen} onClose={() => setIsMyModalOpen(false)}>
-              <h1>Completions</h1>
+              <h1 style={sectionHeaderStyle}>Completions</h1>
               {completedCovers.map((cover:any) => (
                 <div style={playerStyle}>
                   <div><span style={playerNameStyle}>{JSON.stringify(cover.corners).replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '')}</span></div>
@@ -607,7 +676,7 @@ const Game: React.FC<Props> = ({ user_id }) => {
                 </div>
               ))}
             </Modal>
-            <button onClick={logout} style={{ marginTop: '10px' }}>Logout</button>
+            <button onClick={logout} style={redButtonStyle}>Logout</button>
           </div>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Cover Info</div>
@@ -625,21 +694,21 @@ const Game: React.FC<Props> = ({ user_id }) => {
         <div style={{display: 'flex', flexDirection: 'column'}}>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Leaderboard</div>
-            {leaderboardData.slice(0, 5).map((player:any) => (
+            {leaderboardData.slice(0, 3).map((player:any) => (
             <div style={playerStyle}>
-              <div><span style={playerNameStyle}>{player.name}</span></div>
+              <div><span style={playerNameStyle}>{player.name || "Anonymous Hunter"}</span></div>
               <div style={playerScoreStyle}>{player.total_points}</div>
             </div>
             ))}
-            <button onClick={() => setIsModalOpen(true)}>
+            <button style={buttonStyle} onClick={() => setIsModalOpen(true)}>
               View More
             </button>
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-              <h1>Leaderboard</h1>
+              <h1 style={sectionHeaderStyle}>Leaderboard</h1>
               {leaderboardData.map((player:any) => (
                 <div style={playerStyle}>
-                  <div><span style={playerNameStyle}>{player.name}</span></div>
+                  <div><span style={playerNameStyle}>{player.name || "Anonymous Hunter"}</span></div>
                   <div style={playerScoreStyle}>{player.total_points}</div>
                 </div>
               ))}
@@ -647,20 +716,21 @@ const Game: React.FC<Props> = ({ user_id }) => {
           </div>
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Most Recent Completions</div>
-            {recentCompletions.slice(0, 5).map((completion:any, index) => (
+            {recentCompletions.slice(0, 3).map((completion:any, index) => (
               <div key={index} style={playerStyle}>
-                <div><span style={playerNameStyle}>{completion.name}</span></div>
+                <div><span style={playerNameStyle}>{completion.name || "Anonymous Hunter"}</span></div>
                 <div style={{ color: '#666' }}>{completion.date.toLocaleDateString()}</div>
               </div>
             ))}
-            <button onClick={() => setIsCompletionsModalOpen(true)}>
+            <button style={buttonStyle} onClick={() => setIsCompletionsModalOpen(true)}>
               View More
             </button>
 
             <Modal isOpen={isCompletionsModalOpen} onClose={() => setIsCompletionsModalOpen(false)}>
+              <h1 style={sectionHeaderStyle}>Recent Completions</h1>
               {recentCompletions.map((completion:any, index) => (
                 <div key={index} style={playerStyle}>
-                  <div><span style={playerNameStyle}>{completion.name}</span></div>
+                  <div><span style={playerNameStyle}>{completion.name || "Anonymous Hunter"}</span></div>
                   <div style={{ color: '#666' }}>{completion.date.toLocaleDateString()}</div>
                 </div>
               ))}

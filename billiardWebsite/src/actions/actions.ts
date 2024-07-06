@@ -250,6 +250,12 @@ export async function loginUser(username: string, password: string): Promise<boo
         const isPasswordCorrect = await bcrypt.compare(password, hashedPassword);
 
         if (isPasswordCorrect) {
+            //Delete all user cookies
+            const cookieStore = cookies();
+            if (cookieStore.get('session_token')) {
+                cookieStore.delete('session_token');
+            }
+
             // Generate a session token
             const sessionToken = generateSessionToken();
 
@@ -299,18 +305,18 @@ export async function claimCover(cover_id: number, user_id:string) {
         const coversQuery = `SELECT * FROM user_claimed_cover WHERE user_id = $1;`;
         const coversRes = await client.query(coversQuery, [user_id]);
 
-        if (coversRes.rowCount >= 1) {
+        if (coversRes.rowCount > 1) {
             return false;
         }
 
         // Insert the user claimed cover into the database
         const insertQuery = `INSERT INTO user_claimed_cover (user_id, cover_id) VALUES ($1, $2);`;
+        
         await client.query(insertQuery, [user_id, cover_id]);
 
         return true;
     } catch (error) {
-        console.error('Error claiming cover:', error);
-        throw error; // Rethrow the error to be handled by the caller
+        return false;
     } finally {
         if (client) {
             client.release(); // Release the client back to the pool
@@ -360,7 +366,7 @@ async function validateSessionCookie(user_id: string) {
             return false;
         }
 
-        
+        refreshUserSession(user_id);
 
         return true;
     } catch (error) {
@@ -489,15 +495,28 @@ export async function completeCoverRequest(cover_id: number, user_id: string) {
 }
 
 export async function deleteAllSessionsForUser(user_id: string) {
+    //validate
+    if (!await validateSessionCookie(user_id)) {
+        return false;
+    }
     let client;
+
     try {
+        const cookieStore = cookies();
+        if (cookieStore.get('session_token')) {
+            cookieStore.delete('session_token');
+        }
         client = await pool.connect();
         await client.query('SET search_path TO kaiden');
-
         const query = `DELETE FROM sessions WHERE user_id = $1;`;
-        await client.query(query, [user_id]);
+        const res = await client.query(query, [user_id]);
+        if (res) {
+            return true;
+        }
+        return false;
     } catch (error) {
         console.error('Error deleting all sessions for user:', error);
+        return false;
     } finally {
         if (client) {
             client.release(); // Release the client back to the pool
@@ -634,11 +653,16 @@ export async function getAllClaimants(cover_id: number) {
         client = await pool.connect();
         await client.query('SET search_path TO kaiden');
 
-        const query = `SELECT username, info as name
+        const query = `SELECT users.id AS user_id, username, info as name, claimation_date as date, SUM(c1.points) AS total_points
                         FROM users
                         JOIN user_claimed_cover ON users.id = user_claimed_cover.user_id
-                        WHERE cover_id = $1;`;
+                        LEFT JOIN user_completed_cover ON users.id = user_completed_cover.user_id
+                        LEFT JOIN covers c1 ON user_completed_cover.cover_id = c1.id
+                        JOIN covers c2 ON user_claimed_cover.cover_id = c2.id
+                        WHERE c2.id = $1
+                        GROUP BY users.id, username, name, date;`;
         const res = await client.query(query, [cover_id]);
+        console.log(res.rows)
         return res.rows;
     } catch (error) {
         console.error('Error getting claimants:', error);
@@ -672,6 +696,10 @@ export async function updateInfoForUser(user_id: string, info: string) {
 }
 
 export async function getLogoForUser(user_id: string) {
+    if (!await validateSessionCookie(user_id)) {
+        return null;
+    }
+    
     let client;
     try {
         client = await pool.connect();
@@ -682,7 +710,7 @@ export async function getLogoForUser(user_id: string) {
 
         if (res.rowCount === 0) {
             return null;
-        }
+        }    
 
         return res.rows[0].logo;
     } catch (error) {
@@ -712,6 +740,63 @@ export async function getInfoForUser(user_id: string) {
     } catch (error) {
         console.error('Error getting info for user:', error);
         return null;
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function getUserIdFromCookie() {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const cookieStore = cookies();
+        const session_cookie = cookieStore.get('session_token');
+        if (!session_cookie || session_cookie === undefined || session_cookie === null) {
+            console.log('No session cookie found');
+            return null;
+        }
+
+        const query = `SELECT user_id FROM sessions WHERE session_id = $1;`;
+        const res = await client.query(query, [session_cookie.value]);
+
+        if (res.rowCount === 0) {
+            return null;
+        }
+        console.log(res.rows[0])
+        return res.rows[0].user_id;
+    } catch (error) {
+        console.error('Error getting user id from cookie:', error);
+        return null;
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+async function refreshUserSession(user_id: string) {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO kaiden');
+
+        const cookieStore = cookies();
+        const session_cookie = cookieStore.get('session_token');
+        if (!session_cookie || session_cookie === undefined || session_cookie === null) {
+            console.log('No session cookie found');
+            return false;
+        }
+
+        const query = `UPDATE sessions SET login_date = NOW() WHERE user_id = $1 AND session_id = $2;`;
+        await client.query(query, [user_id, session_cookie.value]);
+        return true;
+    } catch (error) {
+        console.error('Error refreshing user session:', error);
+        return false;
     } finally {
         if (client) {
             client.release(); // Release the client back to the pool

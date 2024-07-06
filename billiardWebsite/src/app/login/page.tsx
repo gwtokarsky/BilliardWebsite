@@ -1,6 +1,8 @@
 "use client";
 import React, { useState } from 'react';
 import { getUser, loginUser } from '@/actions/actions';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const LoginPage: React.FC = () => {
     const [username, setUsername] = useState('');
@@ -25,18 +27,37 @@ const LoginPage: React.FC = () => {
                 console.log('User logged in successfully');
             } else {
                 console.log('User not found');
+                toast.error('Login Failed', {
+                    position: "top-right",
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+                return;
             }
 
             const user = await getUser(username);
-            console.log(user.id);
 
-            // Redirect to main page but with user id
-            window.location.href = `/?user_id=${user.id}`;
+            window.location.href = `/`;
         }
     };
 
     return (
         <div style={styles.container}>
+            <ToastContainer
+                position="top-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+            />
             <h1>Login</h1>
             <form onSubmit={handleSubmit} style={styles.form}>
                 <div style={styles.inputGroup}>

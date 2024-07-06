@@ -1,16 +1,18 @@
-"use client"
+"use client";
 import { getUsers } from "@/actions/actions";
 import { useEffect, useState } from "react";
 import 'react-toastify/dist/ReactToastify.css';
+import background from "/public/Geometric-Background-1187.png"; // Ensure this path is correct
 
 import Game from "./game";
 import { ToastContainer } from "react-toastify";
+
 export default function Home() {
   const [userID, setUserID] = useState("");
+
   const getUsersFromServer = async () => {
-    
     try {
-      const response = await getUsers();
+      const response= await getUsers();
       console.log(response);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -26,10 +28,15 @@ export default function Home() {
     setUserID(getUserIDFromURL() ?? "");
   }, []);
 
-
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      {/* make a game component that takes in a user_id prop get the user id from url*/}
+    <main
+      className="flex min-h-screen flex-col items-center justify-between p-24"
+      style={{
+        backgroundImage: `url(${background.src})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
       <Game user_id={userID} />
       <ToastContainer />
     </main>
