@@ -22,7 +22,9 @@ def main():
 
         print("c to create a new cover, r to create a new region, cf to add covers from file,")
         print("dc to delete a cover, dr to delete a region,")
-        print("o to complete a cover manually, x to manage cover completion requests, q to quit")
+        print("o to complete a cover manually, (NOT IMPLEMENTED) x to manage cover completion requests,")
+        print("sc to select all covers, sr to select all regions, su to select all users,")
+        print("q to quit")
 
         while True:
             choice = input("Enter your choice: ")
@@ -58,14 +60,23 @@ def main():
                 delete_cover(cover_id, cursor)
                 conn.commit()
             elif choice == 'dr':
-                pass
+                region_id = int(input("Enter the region id: "))
+                delete_region(region_id, cursor)
+                conn.commit()
             elif choice == 'o':
                 cover_id = int(input("Enter the cover id: "))
                 username = input("Enter the username: ")
                 complete_cover_manually(cover_id, username, cursor)
                 conn.commit()
             elif choice == 'x':
-                complete_cover_through_request(cursor)
+                #complete_cover_through_request(cursor)
+                #conn.commit()
+                pass
+            elif choice == 'sc':
+                select_all_covers(cursor)
+                conn.commit()
+            elif choice == 'sr':
+                select_all_regions(cursor)
                 conn.commit()
             elif choice == 'q':
                 cursor.close()
@@ -258,6 +269,50 @@ def delete_cover(cover_id, cursor):
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error deleting cover:", error)
 
-main()
+def delete_region(region_id, cursor):
+    try:
+        cursor.execute("SELECT id FROM region WHERE id = %s", (region_id,))
+        rows = cursor.fetchone()
+        if not rows:
+            raise Exception("Region does not exist")
+        
+        #get all covers in region and delete them
+        cursor.execute("SELECT cover_id FROM cover_in_region WHERE region_id = %s", (region_id,))
+        rows = cursor.fetchall()
+        for row in rows:
+            delete_cover(row[0], cursor)
+        
+        cursor.execute("DELETE FROM region_has_corner WHERE region_id = %s", (region_id,))
+        cursor.execute("DELETE FROM cover_in_region WHERE region_id = %s", (region_id,))
+        cursor.execute("DELETE FROM region WHERE id = %s", (region_id,))
+        print("Region deleted successfully")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error deleting region:", error)
 
-#dwdw
+def select_all_covers(cursor):
+    try:
+        cursor.execute("SELECT * FROM covers")
+        rows = cursor.fetchall()
+        for row in rows:
+            print(f"ID: {row[0]}, Points: {row[1]}")
+            cursor.execute("SELECT cornerx, cornery FROM has_corner WHERE cover_id = %s ORDER BY POSITION ASC", (row[0],))
+            corners = cursor.fetchall()
+            print("Corners:", corners)
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error selecting all covers:", error)
+
+def select_all_regions(cursor):
+    try:
+        cursor.execute("SELECT * FROM region")
+        rows = cursor.fetchall()
+        for row in rows:
+            print(f"ID: {row[0]}, Points: {row[1]}, Color: {row[2]}")
+            cursor.execute("SELECT cornerx, cornery FROM region_has_corner WHERE region_id = %s ORDER BY POSITION ASC", (row[0],))
+            corners = cursor.fetchall()
+            print("Corners:", corners)
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error selecting all regions:", error)
+
+main()
