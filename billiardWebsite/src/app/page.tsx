@@ -1,5 +1,4 @@
 "use client";
-import { getUsers } from "@/actions/actions";
 import { useEffect, useState } from "react";
 import 'react-toastify/dist/ReactToastify.css';
 import background from "/public/Geometric-Background-1187.png"; // Ensure this path is correct
@@ -9,15 +8,6 @@ import { ToastContainer } from "react-toastify";
 
 export default function Home() {
   const [userID, setUserID] = useState("");
-
-  const getUsersFromServer = async () => {
-    try {
-      const response= await getUsers();
-      console.log(response);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-    }
-  };
 
   useEffect(() => {
     const getUserIDFromURL = () => {

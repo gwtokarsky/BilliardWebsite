@@ -1,11 +1,8 @@
-
 "use server";
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const uuid = require('uuid');
 import { cookies, headers } from 'next/headers';
-
-
 
 const pool = new Pool({
     user: process.env.DB_USER,
@@ -14,24 +11,6 @@ const pool = new Pool({
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
 });
-
-export async function getUsers() {
-    let client;
-    try {
-        client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
-        await client.query("INSERT INTO users (password, info, total_points) VALUES ('Alice', 'kaiden', 0);");
-        const res = await client.query('SELECT * FROM users;');
-    } catch (error) {
-        console.error('Error fetching users:', error);
-        throw error; // Rethrow the error to be handled by the caller
-    } finally {
-        if (client) {
-            client.release(); // Release the client back to the pool
-        }
-    }
-}
-
 
 export async function get_region_corners(region_id: number) {
     let res;
@@ -462,37 +441,37 @@ export async function isComplete(cover_id: number) {
     }
 }
 
-export async function completeCoverRequest(cover_id: number, user_id: string) {
-    if (!await validateSessionCookie(user_id)) {
-        return false;
-    }
-    let client;
-    try {
-        client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+// export async function completeCoverRequest(cover_id: number, user_id: string) {
+//     if (!await validateSessionCookie(user_id)) {
+//         return false;
+//     }
+//     let client;
+//     try {
+//         client = await pool.connect();
+//         await client.query('SET search_path TO kaiden');
 
-        // Check if the user has already completed the cover
-        const completedCoverQuery = `SELECT * FROM user_completed_cover WHERE cover_id = $2;`;
-        const completedCoverRes = await client.query(completedCoverQuery, [user_id, cover_id]);
+//         // Check if the user has already completed the cover
+//         const completedCoverQuery = `SELECT * FROM user_completed_cover WHERE cover_id = $2;`;
+//         const completedCoverRes = await client.query(completedCoverQuery, [user_id, cover_id]);
 
-        if (completedCoverRes.rowCount >= 1) {
-            return false;
-        }
+//         if (completedCoverRes.rowCount >= 1) {
+//             return false;
+//         }
 
-        // Insert the user completed cover into the database
-        const insertQuery = `INSERT INTO user_completed_cover (user_id, cover_id) VALUES ($1, $2);`;
-        await client.query(insertQuery, [user_id, cover_id]);
+//         // Insert the user completed cover into the database
+//         const insertQuery = `INSERT INTO user_completed_cover (user_id, cover_id) VALUES ($1, $2);`;
+//         await client.query(insertQuery, [user_id, cover_id]);
 
-        return true;
-    } catch (error) {
-        console.error('Error completing cover:', error);
-        throw error; // Rethrow the error to be handled by the caller
-    } finally {
-        if (client) {
-            client.release(); // Release the client back to the pool
-        }
-    }
-}
+//         return true;
+//     } catch (error) {
+//         console.error('Error completing cover:', error);
+//         throw error; // Rethrow the error to be handled by the caller
+//     } finally {
+//         if (client) {
+//             client.release(); // Release the client back to the pool
+//         }
+//     }
+// }
 
 export async function deleteAllSessionsForUser(user_id: string) {
     //validate
