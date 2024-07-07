@@ -14,7 +14,6 @@ const handle_submit = async (username: string, info :string, password:string) =>
             // Add the user
             await addUser(username, info, password);
             console.log('User registered successfully');
-            console.log(info)
 
             //Redirect to main page but with user id
             const user_id = await getUser(username);

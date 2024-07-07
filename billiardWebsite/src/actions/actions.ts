@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const uuid = require('uuid');
 import { cookies, headers } from 'next/headers';
+import { use } from 'react';
 
 const pool = new Pool({
     user: process.env.DB_USER,
@@ -17,7 +18,7 @@ export async function get_region_corners(region_id: number) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
         res = await client.query(`SELECT cornerx, cornery FROM region_has_corner WHERE region_id = $1 ORDER BY position ASC;`, [region_id]);
     } catch (error) {
         console.error('Error fetching region corners:', error);
@@ -37,7 +38,7 @@ export async function getRegionsWithCorners() {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = ` SELECT 
                             region.id AS region_id, 
@@ -68,7 +69,7 @@ export async function getCoversWithCorners () {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
         const query =  `SELECT 
                             covers.id AS cover_id, 
                             covers.points AS cover_points, 
@@ -114,7 +115,7 @@ export async function setLogoForUser(user_id: string, logo: string) {
     }
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `UPDATE users SET logo = $1 WHERE id = $2;`;
         await client.query(query, [logo, user_id]);
@@ -132,7 +133,7 @@ export async function addUser(username: string, info:string, password: string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         // Hash the password
         const hashedPassword = await hashPassword(password);
@@ -156,7 +157,7 @@ export async function getUser(username: string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT * FROM users WHERE username = $1;`;
         const res = await client.query(query, [username]);
@@ -189,9 +190,10 @@ export async function checkIfUserExists(username: string): Promise<boolean> {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT * FROM users WHERE username = $1;`;
+        console.log(process.env.DB_SCHEMA)
         const res = await client.query(query, [username]);
 
         if (res.rowCount === 0) {
@@ -213,9 +215,10 @@ export async function loginUser(username: string, password: string): Promise<boo
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT * FROM users WHERE username = $1;`;
+        console.log(process.env.DB_SCHEMA)
         const res = await client.query(query, [username]);
 
         if (res.rowCount === 0) {
@@ -278,7 +281,7 @@ export async function claimCover(cover_id: number, user_id:string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         // Check if the user has already claimed a covers
         const coversQuery = `SELECT * FROM user_claimed_cover WHERE user_id = $1;`;
@@ -308,7 +311,7 @@ async function validateSessionCookie(user_id: string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const cookieStore = cookies();
         const session_cookie = cookieStore.get('session_token');
@@ -373,7 +376,7 @@ export async function getUsernameFromId(user_id: string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT username FROM users WHERE id = $1;`;
         const res = await client.query(query, [user_id]);
@@ -397,7 +400,7 @@ export async function hasClaimant(cover_id: number) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT * FROM user_claimed_cover WHERE cover_id = $1;`;
         const res = await client.query(query, [cover_id]);
@@ -421,7 +424,7 @@ export async function isComplete(cover_id: number) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT * FROM user_completed_cover WHERE cover_id = $1;`;
         const res = await client.query(query, [cover_id]);
@@ -448,7 +451,7 @@ export async function isComplete(cover_id: number) {
 //     let client;
 //     try {
 //         client = await pool.connect();
-//         await client.query('SET search_path TO kaiden');
+//         await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
 //         // Check if the user has already completed the cover
 //         const completedCoverQuery = `SELECT * FROM user_completed_cover WHERE cover_id = $2;`;
@@ -486,7 +489,7 @@ export async function deleteAllSessionsForUser(user_id: string) {
             cookieStore.delete('session_token');
         }
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
         const query = `DELETE FROM sessions WHERE user_id = $1;`;
         const res = await client.query(query, [user_id]);
         if (res) {
@@ -507,8 +510,11 @@ export async function getClaimedCoversForUser(user_id: string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
-
+        if (!user_id) {
+            return [];
+        }
+        console.log(user_id)
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
         const query = ` SELECT c.points, JSON_AGG((cornerx, cornery) ORDER BY position) AS corners 
                         FROM covers c
                         JOIN has_corner hc ON c.id = hc.cover_id
@@ -532,7 +538,7 @@ export async function getLeaderboard() {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT username, info as name, SUM(points) AS total_points
                         FROM users
@@ -556,7 +562,7 @@ export async function getMostRecentCompletionData() {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT username, info as name, completion_date as date
                         FROM users
@@ -578,7 +584,7 @@ export async function getCompletedCoversForUser(user_id: string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = ` SELECT completion_date, c.points, JSON_AGG((cornerx, cornery) ORDER BY position) AS corners 
                         FROM covers c
@@ -603,7 +609,7 @@ export async function getUserPoints(user_id: string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT SUM(points) AS total_points
                         FROM user_completed_cover
@@ -630,7 +636,7 @@ export async function getAllClaimants(cover_id: number) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT users.id AS user_id, username, info as name, claimation_date as date, SUM(c1.points) AS total_points
                         FROM users
@@ -660,7 +666,7 @@ export async function updateInfoForUser(user_id: string, info: string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `UPDATE users SET info = $1 WHERE id = $2;`;
         await client.query(query, [info, user_id]);
@@ -682,7 +688,7 @@ export async function getLogoForUser(user_id: string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT logo FROM users WHERE id = $1;`;
         const res = await client.query(query, [user_id]);
@@ -706,7 +712,7 @@ export async function getInfoForUser(user_id: string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT info FROM users WHERE id = $1;`;
         const res = await client.query(query, [user_id]);
@@ -730,7 +736,7 @@ export async function getUserIdFromCookie() {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const cookieStore = cookies();
         const session_cookie = cookieStore.get('session_token');
@@ -761,7 +767,7 @@ async function refreshUserSession(user_id: string) {
     let client;
     try {
         client = await pool.connect();
-        await client.query('SET search_path TO kaiden');
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const cookieStore = cookies();
         const session_cookie = cookieStore.get('session_token');

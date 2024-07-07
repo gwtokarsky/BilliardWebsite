@@ -53,7 +53,7 @@ const RegisterPage: React.FC = () => {
                     />
                 </div>
                 <p style={{ fontSize: '10px', textAlign: 'center' }}>
-                    Note, the message that will be displayed when a cover is complete is: Cover Completed by {name || "An Anonymous Hunter"}
+                    Note: the display name will be shown on completed covers and on the leaderboard
                 </p>
                 <div style={styles.inputGroup}>
                     <label htmlFor="password">Password:</label>

@@ -17,7 +17,7 @@ def main():
         )
 
         cursor = conn.cursor()
-        cursor.execute('SET search_path TO kaiden')
+        cursor.execute('SET search_path TO ' + os.getenv("DB_SCHEMA"))
         conn.commit()
 
         print("c to create a new cover, r to create a new region, cf to add covers from file,")
@@ -33,7 +33,7 @@ def main():
                 r_input = input("Enter the points of the region: ")
                 r_corners_string = r_input.replace(',', ' ').split(" ")
                 try:
-                    r_corners = [(int(r_corners_string[i]), int(r_corners_string[i+1])) for i in range(0, len(r_corners_string), 2)]
+                    r_corners = [(float(r_corners_string[i]), float(r_corners_string[i+1])) for i in range(0, len(r_corners_string), 2)]
                     r_points = int(input("Enter the number of points for each cover in the region: "))
                     color = input("Enter the color of the region: ")
                     create_region(r_corners, r_points, color, cursor)
@@ -44,7 +44,7 @@ def main():
                 c_input = input("Enter the points of the cover: ")
                 c_corners_string = c_input.replace(',', ' ').split(" ")
                 try:
-                    c_corners = [(int(c_corners_string[i]), int(c_corners_string[i+1])) for i in range(0, len(c_corners_string), 2)]
+                    c_corners = [(float(c_corners_string[i]), float(c_corners_string[i+1])) for i in range(0, len(c_corners_string), 2)]
                     region_id = int(input("Enter the region id to add the cover to: "))
                     create_cover(c_corners, region_id, cursor)
                     conn.commit()
@@ -263,7 +263,6 @@ def delete_cover(cover_id, cursor):
         cursor.execute("DELETE FROM has_corner WHERE cover_id = %s", (cover_id,))
         cursor.execute("DELETE FROM cover_in_region WHERE cover_id = %s", (cover_id,))
         cursor.execute("DELETE FROM user_completed_cover WHERE cover_id = %s", (cover_id,))
-        cursor.execute("DELETE FROM cover_completion_request WHERE cover_id = %s", (cover_id,))
         cursor.execute("DELETE FROM covers WHERE id = %s", (cover_id,))
         print("Cover deleted successfully")
     except (Exception, psycopg2.DatabaseError) as error:
