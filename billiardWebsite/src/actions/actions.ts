@@ -336,8 +336,8 @@ async function validateSessionCookie(user_id: string) {
         const currentDate = new Date();
         //get the expiration date and time
         const sessionExpiration = new Date(login_date);
-        //add 1 day to the expiration date
-        sessionExpiration.setDate(sessionExpiration.getDate() + 1);
+        //add 15 min to expiration date
+        sessionExpiration.setMinutes(sessionExpiration.getMinutes() + 15);
         if (currentDate > sessionExpiration) {
             //delete the session from the sessions table
             const deleteQuery = `DELETE FROM sessions WHERE user_id = $1 AND session_id = $2;`;

@@ -223,7 +223,7 @@ def complete_cover_manually(cover_id, username, cursor):
         
 
         cursor.execute("INSERT INTO user_completed_cover (cover_id, user_id) VALUES (%s, %s)", (cover_id, rows[0]))
-        print("Cover completion request submitted")
+        print("Cover completed successfully")
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error completing cover manually:", error)
 
@@ -297,7 +297,8 @@ def select_all_covers(cursor):
             print(f"ID: {row[0]}, Points: {row[1]}")
             cursor.execute("SELECT cornerx, cornery FROM has_corner WHERE cover_id = %s ORDER BY POSITION ASC", (row[0],))
             corners = cursor.fetchall()
-            print("Corners:", corners)
+            corners_str = ' '.join([f"{x},{y}" for x, y in corners])
+            print("Corners:", corners_str)
 
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error selecting all covers:", error)
