@@ -513,7 +513,6 @@ export async function getClaimedCoversForUser(user_id: string) {
         if (!user_id) {
             return [];
         }
-        console.log(user_id)
         await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
         const query = ` SELECT c.points, JSON_AGG((cornerx, cornery) ORDER BY position) AS corners 
                         FROM covers c
@@ -782,6 +781,30 @@ async function refreshUserSession(user_id: string) {
     } catch (error) {
         console.error('Error refreshing user session:', error);
         return false;
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function getDefaultLogo() {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
+
+        const query = `SELECT logo FROM users WHERE username = 'default';`;
+        const res = await client.query(query);
+
+        if (res.rowCount === 0) {
+            return null;
+        }
+
+        return res.rows[0].logo;
+    } catch (error) {
+        console.error('Error getting default logo:', error);
+        return null;
     } finally {
         if (client) {
             client.release(); // Release the client back to the pool

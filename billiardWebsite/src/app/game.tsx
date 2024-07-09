@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import * as d3 from 'd3';
 import { Console } from 'console';
-import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants, setLogoForUser, updateInfoForUser, getInfoForUser, getLogoForUser, getUserIdFromCookie} from '@/actions/actions';
+import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants, setLogoForUser, updateInfoForUser, getInfoForUser, getLogoForUser, getUserIdFromCookie, getDefaultLogo} from '@/actions/actions';
 import { ToastContainer, toast } from 'react-toastify';
 import { get } from 'http';
 import Modal from './modal';
@@ -134,13 +134,14 @@ const Game: React.FC<Props> = () => {
   const [userIdTryCount, setUserIdTryCount] = useState(0);
   const [newInfo, setNewInfo] = useState("");
   const [userId, setUserId] = useState("");
+  const [defaultLogo, setDefaultLogo] = useState("");
 
   const handleFileChange = (event: any) => {
     const file = event.target.files[0];
     if (file) {
       const reader: FileReader = new FileReader();
       reader.onloadend = () => {
-        setSelectedImage((reader.result as string)); // Provide a default value for setSelectedImage
+        setSelectedImage((reader.result as string));
       };
       reader.readAsDataURL(file);
     }
@@ -151,7 +152,7 @@ const Game: React.FC<Props> = () => {
       const img = new Image();
       img.onload = () => resolve(img);
       img.onerror = reject;
-      img.src = src;
+      img.src = src ?? defaultLogo;
     });
   };
 
@@ -165,6 +166,8 @@ const Game: React.FC<Props> = () => {
     await setLeaderboardData(leaderboard);
     const recentCompletions = await getMostRecentCompletionData();
     await setRecentCompletions(recentCompletions);
+    const defaultLogo = await getDefaultLogo();
+    await setDefaultLogo(defaultLogo);
   };
 
   const getRegions = async () => {
@@ -208,8 +211,7 @@ const Game: React.FC<Props> = () => {
       
       
       let polygon: Polygon 
-      
-      if(region.logo != null && region.logo != undefined && region.logo != "") {
+      if (region.completed) {
         img = await loadImage(region.logo);
         polygon = {
           points: corners,
@@ -220,7 +222,7 @@ const Game: React.FC<Props> = () => {
       else {
         polygon = {
           points: corners,
-          stroke: border,
+          stroke: border
         };
       }
 
@@ -241,7 +243,27 @@ const Game: React.FC<Props> = () => {
     for (let i = 0; i < completePolygonList.length; i++) {
       polygonList.push(completePolygonList[i]);
     } 
-    await setPolygons(polygonList);
+
+    let reflectedPolygonList = [] as Polygon[];
+    polygonList.forEach(polygon => {
+      reflectedPolygonList.push(polygon);
+      let newPolygon = {...polygon};
+      newPolygon.points = polygon.points.map(point => [canvasSize - point[1], canvasSize - point[0]]);
+      reflectedPolygonList.push(newPolygon);
+      newPolygon = {...polygon};
+      newPolygon.points = polygon.points.map(point => [point[0], canvasSize - point[1] + point[0]]);
+      reflectedPolygonList.push(newPolygon);
+      newPolygon = {...polygon};
+      newPolygon.points = polygon.points.map(point => [canvasSize - point[1], canvasSize - point[1] + point[0]]);
+      reflectedPolygonList.push(newPolygon);
+      newPolygon = {...polygon};
+      newPolygon.points = polygon.points.map(point => [point[1] - point[0], canvasSize - point[0]]);
+      reflectedPolygonList.push(newPolygon);
+      newPolygon = {...polygon};
+      newPolygon.points = polygon.points.map(point => [point[1] - point[0], point[1]]);
+      reflectedPolygonList.push(newPolygon);
+    });
+    await setPolygons(reflectedPolygonList);
   };
 
   const findContainingCover = async (x: number, y: number) => {
@@ -258,9 +280,14 @@ const Game: React.FC<Props> = () => {
     // }
     // const response2 = await getCoversFromRegionWithCorners(containing_region.region_id);
     let containing_cover = null;
+    let actuals = [x,y,180 - x - y];
+    actuals.sort((a, b) => a - b);
+    let actualx = actuals[0];
+    let actualy = actuals[1];
     for (let i = 0; i < covers.length; i++) {
+      
       const corners = covers[i].corners.map((corner: any) => [corner.f1, corner.f2]);
-      if(d3.polygonContains(corners, [x, y])) {
+      if(d3.polygonContains(corners, [actualx, actualy])) {
         containing_cover = covers[i];
         break;
       }
@@ -325,8 +352,10 @@ const Game: React.FC<Props> = () => {
 
   useEffect(() => {
     const handleMouseClick = async (e: MouseEvent) => {
+      console.log(mousePosition);
       let cover = await findContainingCover(mousePosition.x, mousePosition.y);
       if (cover !== null) {
+        console.log(cover);
         await setSelectedCover(cover);
         await handleSetClaimant(cover.cover_id);
       }
@@ -486,7 +515,7 @@ const Game: React.FC<Props> = () => {
     }
     return (
       <div>
-        <p>Points: {(selectedCover as any).cover_points}</p>
+        <p>Points: {(selectedCover as any).cover_points || "Immeasurable"}</p>
         <p>Corners: {JSON.stringify((selectedCover as any).corners)
           .replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '')}</p>
         <p>{(selectedCover as any).completed ? (
@@ -709,7 +738,7 @@ const Game: React.FC<Props> = () => {
               {leaderboardData.map((player:any) => (
                 <div style={playerStyle}>
                   <div><span style={playerNameStyle}>{player.name || "Anonymous Hunter"}</span></div>
-                  <div style={playerScoreStyle}>{player.total_points}</div>
+                  <div style={playerScoreStyle}>{player.total_points < 0.1 ?  "Immeasurable" : player.total_points}</div>
                 </div>
               ))}
             </Modal>
