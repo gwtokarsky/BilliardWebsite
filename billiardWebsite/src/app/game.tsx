@@ -15,6 +15,8 @@ interface Polygon {
   image?: any;
 }
 
+const dateOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+
 const containerStyle = {
   display: 'flex',
   flexDirection: 'row',
@@ -134,7 +136,6 @@ const Game: React.FC<Props> = () => {
   const [userIdTryCount, setUserIdTryCount] = useState(0);
   const [newInfo, setNewInfo] = useState("");
   const [userId, setUserId] = useState("");
-  const [defaultLogo, setDefaultLogo] = useState("");
 
   const handleFileChange = (event: any) => {
     const file = event.target.files[0];
@@ -152,7 +153,7 @@ const Game: React.FC<Props> = () => {
       const img = new Image();
       img.onload = () => resolve(img);
       img.onerror = reject;
-      img.src = src ?? defaultLogo;
+      img.src = src;
     });
   };
 
@@ -166,8 +167,6 @@ const Game: React.FC<Props> = () => {
     await setLeaderboardData(leaderboard);
     const recentCompletions = await getMostRecentCompletionData();
     await setRecentCompletions(recentCompletions);
-    const defaultLogo = await getDefaultLogo();
-    await setDefaultLogo(defaultLogo);
   };
 
   const getRegions = async () => {
@@ -192,26 +191,23 @@ const Game: React.FC<Props> = () => {
       polygonList.push(polygon);
     });
 
-    const completePolygonList = [] as Polygon[];
+    const incompletePolygonList = [] as Polygon[];
     const claimedPolygonList = [] as Polygon[];
     await Promise.all(await covers.map(async (region: any) => {
       const corners = region.corners.map((corner: any) => [corner.f1 / 180 * canvasSize, (180 - corner.f2) / 180 * canvasSize]);  
       let border;
       let img;
-      if (region.completed) {
-        border = 'green';
-      }
-      else if (region.claimed) {
+      if (region.claimed) {
         border = 'orange';
       }
-      else {
+      else if (!region.completed) {
         border = 'maroon';
       }
 
       
       
       let polygon: Polygon 
-      if (region.completed) {
+      if (region.completed && region.logo !== null && region.logo !== undefined && region.logo !== "") {
         img = await loadImage(region.logo);
         polygon = {
           points: corners,
@@ -227,21 +223,21 @@ const Game: React.FC<Props> = () => {
       }
 
       if (border == 'maroon') {
-        await polygonList.push(polygon);
+        await incompletePolygonList.push(polygon);
       }
       else if (border == 'orange') {
         await claimedPolygonList.push(polygon);
       }
       else {
-        await completePolygonList.push(polygon);
+        await polygonList.push(polygon);
       }
     }));
 
     for (let i = 0; i < claimedPolygonList.length; i++) {
       polygonList.push(claimedPolygonList[i]);
     }
-    for (let i = 0; i < completePolygonList.length; i++) {
-      polygonList.push(completePolygonList[i]);
+    for (let i = 0; i < incompletePolygonList.length; i++) {
+      polygonList.push(incompletePolygonList[i]);
     } 
 
     let reflectedPolygonList = [] as Polygon[];
@@ -427,8 +423,13 @@ const Game: React.FC<Props> = () => {
       });
       context.closePath();
       context.fillStyle = polygon.fillColor ?? 'transparent';
-      context.lineWidth = Math.min((polygonLength(polygon) / 25), 4 / zoom);
+      context.lineWidth = Math.min(0.5, 4 / zoom);
       context.strokeStyle = polygon.stroke ?? 'black';
+
+      if (polygon.stroke == 'maroon') {
+        context.lineWidth /= 2.3;
+      } 
+
       context.stroke();
       context.globalAlpha = polygon.fillOpacity ?? 1;
       context.fill();
@@ -482,6 +483,7 @@ const Game: React.FC<Props> = () => {
     context.font = '14px Arial';
     context.fillStyle = 'gold'; // Set the fill color to gold
     context.strokeStyle = 'black'; // Set the stroke color to black
+    
     context.lineWidth = 3; // Set the outline width
 
     const infoLines = [
@@ -570,7 +572,7 @@ const Game: React.FC<Props> = () => {
                           <div style={playerStyle}>
                             <div><span>{claimant.username}</span></div>
                             <div><span>{(claimant.total_points || "0") + " Total Points"}</span></div>
-                            <div><span>{claimant.date.toLocaleDateString()}</span></div>
+                            <div><span>{claimant.date.toLocaleDateString('en-US', dateOptions)}</span></div>
                           </div>
                         ))}
                       </div>
@@ -700,7 +702,7 @@ const Game: React.FC<Props> = () => {
               {completedCovers.map((cover:any) => (
                 <div style={playerStyle}>
                   <div><span style={playerNameStyle}>{JSON.stringify(cover.corners).replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '')}</span></div>
-                  <div style={playerScoreStyle}>{cover.completion_date.toLocaleDateString()}</div>
+                  <div style={playerScoreStyle}>{cover.completion_date.toLocaleDateString('en-US', dateOptions)}</div>
                   <div style={playerScoreStyle}>{cover.points}</div>
                 </div>
               ))}
@@ -748,7 +750,7 @@ const Game: React.FC<Props> = () => {
             {recentCompletions.slice(0, 3).map((completion:any, index) => (
               <div key={index} style={playerStyle}>
                 <div><span style={playerNameStyle}>{completion.name || "Anonymous Hunter"}</span></div>
-                <div style={{ color: '#666' }}>{completion.date.toLocaleDateString()}</div>
+                <div style={{ color: '#666' }}>{completion.date.toLocaleDateString('en-US', dateOptions)}</div>
               </div>
             ))}
             <button style={buttonStyle} onClick={() => setIsCompletionsModalOpen(true)}>
@@ -760,7 +762,7 @@ const Game: React.FC<Props> = () => {
               {recentCompletions.map((completion:any, index) => (
                 <div key={index} style={playerStyle}>
                   <div><span style={playerNameStyle}>{completion.name || "Anonymous Hunter"}</span></div>
-                  <div style={{ color: '#666' }}>{completion.date.toLocaleDateString()}</div>
+                  <div style={{ color: '#666' }}>{completion.date.toLocaleDateString('en-US', dateOptions)}</div>
                 </div>
               ))}
             </Modal>
