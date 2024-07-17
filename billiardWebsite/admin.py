@@ -214,7 +214,8 @@ def complete_cover_manually(cover_id, username, cursor):
         cursor.execute("SELECT cover_id FROM user_completed_cover WHERE cover_id = %s", (cover_id,))
         rows = cursor.fetchone()
         if rows:
-            raise Exception("Cover already completed")
+            print("Cover already completed, replacing...")
+            cursor.execute("DELETE FROM user_completed_cover WHERE cover_id = %s", (cover_id,))
         
         cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
         rows = cursor.fetchone()
@@ -224,6 +225,7 @@ def complete_cover_manually(cover_id, username, cursor):
 
         cursor.execute("INSERT INTO user_completed_cover (cover_id, user_id) VALUES (%s, %s)", (cover_id, rows[0]))
         print("Cover completed successfully")
+        delete_all_claimants_of_cover(cover_id, cursor)
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error completing cover manually:", error)
 
@@ -314,5 +316,12 @@ def select_all_regions(cursor):
 
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error selecting all regions:", error)
+
+def delete_all_claimants_of_cover(cover_id, cursor):
+    try:
+        count = cursor.execute("DELETE FROM user_claimed_cover WHERE cover_id = %s", (cover_id,))
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error deleting claimants:", error)
+
 
 main()
