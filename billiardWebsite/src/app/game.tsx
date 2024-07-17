@@ -95,7 +95,7 @@ interface Props {
 const sectionStyle = {
   margin: '10px',
   padding: '20px',
-  border: '1px solid #ddd',
+  border: '3px solid black',
   borderRadius: '8px',
   boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
   backgroundColor: '#f9f9f9',
@@ -198,7 +198,7 @@ const Game: React.FC<Props> = () => {
       let border;
       let img;
       if (region.claimed) {
-        border = 'orange';
+        border = 'yellow';
       }
       else if (!region.completed) {
         border = 'maroon';
@@ -225,7 +225,7 @@ const Game: React.FC<Props> = () => {
       if (border == 'maroon') {
         await incompletePolygonList.push(polygon);
       }
-      else if (border == 'orange') {
+      else if (border == 'yellow') {
         await claimedPolygonList.push(polygon);
       }
       else {
@@ -233,12 +233,13 @@ const Game: React.FC<Props> = () => {
       }
     }));
 
-    for (let i = 0; i < claimedPolygonList.length; i++) {
-      polygonList.push(claimedPolygonList[i]);
-    }
+    
     for (let i = 0; i < incompletePolygonList.length; i++) {
       polygonList.push(incompletePolygonList[i]);
     } 
+    for (let i = 0; i < claimedPolygonList.length; i++) {
+      polygonList.push(claimedPolygonList[i]);
+    }
 
     let reflectedPolygonList = [] as Polygon[];
     polygonList.forEach(polygon => {
@@ -402,7 +403,9 @@ const Game: React.FC<Props> = () => {
   const render = () => {
     // Get canvas context
     const canvas = d3.select(canvasRef.current);
-    canvas.style('border', '3px solid black');
+    canvas.style('border', '5px solid white')
+      .style('box-shadow', 'inset 0 0 0 10px black')
+      .style('outline', '10px solid black')
     const context = canvas.node()!.getContext('2d');
 
     if (!context) {
@@ -429,6 +432,9 @@ const Game: React.FC<Props> = () => {
       if (polygon.stroke == 'maroon') {
         context.lineWidth /= 2.3;
       } 
+      else if (polygon.stroke == 'yellow') {
+        context.lineWidth /= 10;
+      }
 
       context.stroke();
       context.globalAlpha = polygon.fillOpacity ?? 1;
