@@ -6,6 +6,7 @@ import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUs
 import { ToastContainer, toast } from 'react-toastify';
 import { get } from 'http';
 import Modal from './modal';
+import numeric from 'numeric';
 
 interface Polygon {
   points: [number, number][];
@@ -13,6 +14,8 @@ interface Polygon {
   fillOpacity?: number;
   stroke?: string;
   image?: any;
+  rotation: number;
+  flipHorizontal: boolean;
 }
 
 const dateOptions = { year: 'numeric', month: 'short', day: 'numeric' };
@@ -177,6 +180,8 @@ const Game: React.FC<Props> = () => {
       {
         points: [[0, canvasSize], [0, 0], [canvasSize, canvasSize]],
         fillColor: 'grey',
+        rotation: 0,
+        flipHorizontal: false,
       },
     ];
 
@@ -185,7 +190,9 @@ const Game: React.FC<Props> = () => {
       const corners = region.corners.map((corner: any) => [corner.f1 / 180 * canvasSize, (180 - corner.f2) / 180 * canvasSize]);  
       const polygon: Polygon = {
         points: corners,
-        fillColor: region.region_color
+        fillColor: region.region_color,
+        rotation: 0,
+        flipHorizontal: false,
       };
 
       polygonList.push(polygon);
@@ -212,13 +219,17 @@ const Game: React.FC<Props> = () => {
         polygon = {
           points: corners,
           stroke: border,
-          image: img
+          image: img,
+          flipHorizontal: false,
+          rotation: 0
         };
       }
       else {
         polygon = {
           points: corners,
-          stroke: border
+          stroke: border,
+          flipHorizontal: false,
+          rotation: 0
         };
       }
 
@@ -246,17 +257,25 @@ const Game: React.FC<Props> = () => {
       reflectedPolygonList.push(polygon);
       let newPolygon = {...polygon};
       newPolygon.points = polygon.points.map(point => [canvasSize - point[1], canvasSize - point[0]]);
+      newPolygon.rotation = 90;
+      newPolygon.flipHorizontal = true;
       reflectedPolygonList.push(newPolygon);
       newPolygon = {...polygon};
+      newPolygon.rotation = 180;
+      newPolygon.flipHorizontal = true;
       newPolygon.points = polygon.points.map(point => [point[0], canvasSize - point[1] + point[0]]);
       reflectedPolygonList.push(newPolygon);
       newPolygon = {...polygon};
+      newPolygon.rotation = 180;
       newPolygon.points = polygon.points.map(point => [canvasSize - point[1], canvasSize - point[1] + point[0]]);
       reflectedPolygonList.push(newPolygon);
       newPolygon = {...polygon};
+      newPolygon.rotation = 90;
       newPolygon.points = polygon.points.map(point => [point[1] - point[0], canvasSize - point[0]]);
       reflectedPolygonList.push(newPolygon);
       newPolygon = {...polygon};
+      newPolygon.rotation = 270;
+      newPolygon.flipHorizontal = true;
       newPolygon.points = polygon.points.map(point => [point[1] - point[0], point[1]]);
       reflectedPolygonList.push(newPolygon);
     });
@@ -439,44 +458,55 @@ const Game: React.FC<Props> = () => {
       context.stroke();
       context.globalAlpha = polygon.fillOpacity ?? 1;
       context.fill();
-    
-      // Check if it's a 4-point polygon and there's a selected image)
+
+      // Check if it's a 4-point polygon and there's a selected image
       if (polygon.points.length === 4 && polygon.image !== null && polygon.image !== undefined) {
-        // Calculate dimensions of the polygon
-        const width = polygon.points[2][0] - polygon.points[0][0];
-        const height = polygon.points[2][1] - polygon.points[0][1];
-    
-        // Calculate scaling factors to fit image within polygon
-        const scaleX = width / polygon.image.width;
-        const scaleY = height / polygon.image.height;
-        const scale = Math.min(scaleX, scaleY);
-    
-        // Calculate center position of the polygon
-        const centerX:any = d3.mean(polygon.points.map(point => point[0]));
-        const centerY:any = d3.mean(polygon.points.map(point => point[1]));
-    
-        // Calculate position to center the image
+        const src = polygon.image;
+        const dst = polygon.points;
         
-        const offsetX = centerX - (polygon.image.width * scale) / 2;
-        const offsetY = centerY - (polygon.image.height * scale) / 2;
-    
-        // Save the current context state before clipping
+        // Calculate the transformation matrix
+        const srcX = [0, src.width, src.width, 0];
+        const srcY = [0, 0, src.height, src.height];
+        const dstX = dst.map(p => p[0]);
+        const dstY = dst.map(p => p[1]);
+        
+        const transform = getTransformMatrix(srcX, srcY, dstX, dstY);
+        
+        // Save the current context state before applying transformation
         context.save();
-        // Set the clipping path to the polygon
-        context.beginPath();
-        context.moveTo(polygon.points[0][0], polygon.points[0][1]);
-        polygon.points.slice(1).forEach(point => {
-          context.lineTo(point[0], point[1]);
-        });
-        context.closePath();
-        context.clip();
-    
-        // Apply transformations
-        context.translate(offsetX, offsetY);
-        context.scale(scale, scale);
-        context.drawImage(polygon.image, 0, 0);
-    
-        // Restore the context to remove the clipping path
+        
+        // Apply the transformation matrix
+        context.transform(transform.a, transform.b, transform.c, transform.d, transform.e, transform.f);
+
+        //rotate the image by the polygon.rotation property with respect to the center of the image
+        context.rotate(polygon.rotation * Math.PI / 180);
+        if (polygon.rotation == 180) {
+          if (polygon.flipHorizontal) {
+            context.translate(0, -src.height);
+          }
+          else {
+            context.translate(-src.width, -src.height);
+          }
+        }
+
+        if (polygon.rotation == 90) {
+          if (polygon.flipHorizontal) {
+            context.translate(src.width, -src.height);
+          }
+          else {
+            context.translate(0, -src.height);
+          }
+        }
+
+        //flip the image horizontally if the flipHorizontal property is true
+        if (polygon.flipHorizontal) {
+          context.scale(-1, 1);
+        }
+        
+        // Draw the image
+        context.drawImage(src, 0, 0);
+        
+        // Restore the context to remove the transformation
         context.restore();
       }
     });
@@ -505,7 +535,32 @@ const Game: React.FC<Props> = () => {
     });
 
     context.restore();
-  };
+};
+
+// Helper function to calculate the transformation matrix
+function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
+    const A = [];
+    for (let i = 0; i < 4; i++) {
+        A.push([srcX[i], srcY[i], 1, 0, 0, 0, -srcX[i] * dstX[i], -srcY[i] * dstX[i]]);
+        A.push([0, 0, 0, srcX[i], srcY[i], 1, -srcX[i] * dstY[i], -srcY[i] * dstY[i]]);
+    }
+
+    const B = [];
+    for (let i = 0; i < 4; i++) {
+        B.push(dstX[i]);
+        B.push(dstY[i]);
+    }
+
+    const h = numeric.solve(A, B);
+    return {
+        a: h[0],
+        b: h[3],
+        c: h[1],
+        d: h[4],
+        e: h[2],
+        f: h[5]
+    };
+}
 
   const handleSetClaimant = async (cover_id: number) => {
     await getAllClaimants(cover_id).then((res) => {
