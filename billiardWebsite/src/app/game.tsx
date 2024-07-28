@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import * as d3 from 'd3';
 import { Console } from 'console';
-import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants, setLogoForUser, updateInfoForUser, getInfoForUser, getLogoForUser, getUserIdFromCookie, getDefaultLogo} from '@/actions/actions';
+import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants, setLogoForUser, updateInfoForUser, getInfoForUser, getLogoForUser, getUserIdFromCookie, getDefaultLogo, getLeaderboardForRegion} from '@/actions/actions';
 import { ToastContainer, toast } from 'react-toastify';
 import { get } from 'http';
 import Modal from './modal';
@@ -139,6 +139,9 @@ const Game: React.FC<Props> = () => {
   const [userIdTryCount, setUserIdTryCount] = useState(0);
   const [newInfo, setNewInfo] = useState("");
   const [userId, setUserId] = useState("");
+  const [selectedCoverChanged, setSelectedCoverChanged] = useState(false);
+  const [coverOpacity, setCoverOpacity] = useState(1);
+  const [useRegionalLeaderboard, setUseRegionalLeaderboard] = useState(true);
 
   const handleFileChange = (event: any) => {
     const file = event.target.files[0];
@@ -166,7 +169,7 @@ const Game: React.FC<Props> = () => {
     await setRegions(regionLoad);
     const coverLoad = await getCoversWithCorners();
     await setCovers(coverLoad);
-    const leaderboard = await getLeaderboard();
+    const leaderboard = await getLeaderboardForRegion();
     await setLeaderboardData(leaderboard);
     const recentCompletions = await getMostRecentCompletionData();
     await setRecentCompletions(recentCompletions);
@@ -370,10 +373,10 @@ const Game: React.FC<Props> = () => {
     const handleMouseClick = async (e: MouseEvent) => {
       console.log(mousePosition);
       let cover = await findContainingCover(mousePosition.x, mousePosition.y);
-      if (cover !== null) {
-        console.log(cover);
+      if (cover !== null && cover !== undefined && cover !== selectedCover) {
         await setSelectedCover(cover);
         await handleSetClaimant(cover.cover_id);
+        await setSelectedCoverChanged(true);
       }
     };
     canvasRef.current!.removeEventListener('click', handleMouseClick);
@@ -445,14 +448,16 @@ const Game: React.FC<Props> = () => {
       });
       context.closePath();
       context.fillStyle = polygon.fillColor ?? 'transparent';
-      context.lineWidth = Math.min(0.5, 4 / zoom);
-      context.strokeStyle = polygon.stroke ?? 'black';
+      context.lineWidth = Math.min(0.5, 8 / zoom);
+      context.strokeStyle = 'black';
 
       if (polygon.stroke == 'maroon') {
-        context.lineWidth /= 2.3;
+        context.lineWidth /= 10000;
+        context.fillStyle = 'rgba(128, 0, 0, 1)';
       } 
       else if (polygon.stroke == 'yellow') {
-        context.lineWidth /= 10;
+        context.lineWidth /= 10000;
+        context.fillStyle = 'rgba(255, 255, 0, 1)';
       }
 
       context.stroke();
@@ -577,15 +582,17 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
       );
     }
     return (
-      <div>
+      <div style={{backgroundColor: `rgba(164, 225, 2, ${coverOpacity})`}}>
         <p>Points: {(selectedCover as any).cover_points || "Immeasurable"}</p>
-        <p>Corners: {JSON.stringify((selectedCover as any).corners)
-          .replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '')}</p>
+        <p style={{fontFamily: 'monospace'}}>
+          Corners: {(selectedCover as any).corners.length == 4 ? JSON.stringify((selectedCover as any).corners)
+            .replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '') : "None"}
+        </p>
         <p>{(selectedCover as any).completed ? (
-            <>
+            <div style={{marginTop: '12px'}}>
               Completed by: <br />
               {(selectedCover as any).info ?? 'An Anonymous Hunter'}
-            </>
+            </div>
           ) : (
             <>
               Incomplete <br />
@@ -622,7 +629,7 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
                       setIsClaimantsModalOpen(true);
                     }}>View All Claimants</button>
                   </>
-                ) : <h2 style={{marginLeft: 10, marginTop: 14}}>unclaimed</h2>}</p>
+                ) : <h2 style={{marginLeft: 10, marginTop: 12}}>unclaimed</h2>}</p>
 
                 <Modal isOpen={isClaimantsModalOpen} onClose={() => setIsClaimantsModalOpen(false)}>
                   <div>
@@ -713,6 +720,27 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
     window.location.reload();
   }
 
+  // if cover text is shaded, decrease the opacity of the cover slowly
+  useEffect(() => {
+    console.log(coverOpacity);
+    setCoverOpacity(1);
+  
+    const interval = setInterval(() => {
+      setCoverOpacity((prevOpacity) => {
+        console.log(prevOpacity);
+        const newOpacity = prevOpacity - 0.1;
+        if (newOpacity <= 0) {
+          clearInterval(interval);
+          return 0;
+        }
+        return newOpacity;
+      });
+    }, 5);
+  
+    return () => clearInterval(interval); // Cleanup on component unmount
+  }, [selectedCover]);
+    
+
   return (
     <div>
       <div style={{display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center'}}>
@@ -720,9 +748,9 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>Profile: {username}</div>
             <p>Total Score: {points || 0} Points</p>
-            <p>Your First Cover: {getCoverOne()}</p>
+            <p>Your First Claim: {getCoverOne()}</p>
             <p>{getCoverCornersOne()}</p>
-            <p>Your Second Cover: {getCoverTwo()}</p>
+            <p>Your Second Claim: {getCoverTwo()}</p>
             <p>{getCoverCornersTwo()}</p>
             <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center'}}>
               <p><button style={{...buttonStyle, marginRight: 10}} onClick={() => setIsEditProfileModalOpen(true)}>Edit Profile</button></p>
@@ -785,19 +813,38 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
         </div>
         <div style={{display: 'flex', flexDirection: 'column'}}>
           <div style={sectionStyle}>
-            <div style={sectionHeaderStyle}>Leaderboard</div>
+            <div style={sectionHeaderStyle}>{useRegionalLeaderboard ? 'Current' : 'Global'} Leaderboard</div>
             {leaderboardData.slice(0, 3).map((player:any) => (
             <div style={playerStyle}>
               <div><span style={playerNameStyle}>{player.name || "Anonymous Hunter"}</span></div>
               <div style={playerScoreStyle}>{player.total_points}</div>
             </div>
             ))}
-            <button style={buttonStyle} onClick={() => setIsModalOpen(true)}>
+            <button style={{...buttonStyle, marginRight: 10}} onClick={() => setIsModalOpen(true)}>
               View More
             </button>
 
+            <button 
+              style={buttonStyle} 
+              onClick={() => {
+                if (useRegionalLeaderboard) {
+                  getLeaderboard().then((res) => {
+                    setLeaderboardData(res);
+                    setUseRegionalLeaderboard(!useRegionalLeaderboard);
+                  });
+                } else {
+                  getLeaderboardForRegion().then((res) => {
+                    setLeaderboardData(res);
+                    setUseRegionalLeaderboard(!useRegionalLeaderboard);
+                  });
+                }
+              }}
+            >
+              Use {useRegionalLeaderboard ? 'Global' : 'Current'} Leaderboard
+            </button>
+
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-              <h1 style={sectionHeaderStyle}>Leaderboard</h1>
+              <h1 style={sectionHeaderStyle}>{useRegionalLeaderboard ? 'Current' : 'Global'} Leaderboard</h1>
               {leaderboardData.map((player:any) => (
                 <div style={playerStyle}>
                   <div><span style={playerNameStyle}>{player.name || "Anonymous Hunter"}</span></div>

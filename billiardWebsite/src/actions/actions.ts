@@ -557,6 +557,32 @@ export async function getLeaderboard() {
     }
 }
 
+export async function getLeaderboardForRegion() {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
+
+        const query = `SELECT username, info as name, SUM(points) AS total_points
+                        FROM users
+                        JOIN user_completed_cover ON users.id = user_completed_cover.user_id
+                        JOIN covers ON user_completed_cover.cover_id = covers.id
+                        JOIN cover_in_region ON covers.id = cover_in_region.cover_id
+                        JOIN selected_regions ON cover_in_region.region_id = selected_regions.region
+                        GROUP BY username, name
+                        ORDER BY total_points DESC;`;
+        const res = await client.query(query);
+        return res.rows;
+    } catch (error) {
+        console.error('Error getting leaderboard for region:', error);
+        return [];
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
 export async function getMostRecentCompletionData() {
     let client;
     try {
