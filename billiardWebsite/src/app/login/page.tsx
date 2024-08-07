@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { getUser, loginUser } from '@/actions/actions';
 import { ToastContainer, toast } from 'react-toastify';
+import background from "/public/Geometric-Background-1187.png";
 import 'react-toastify/dist/ReactToastify.css';
 
 const LoginPage: React.FC = () => {
@@ -46,47 +47,55 @@ const LoginPage: React.FC = () => {
     };
 
     return (
-        <div style={styles.container}>
-            <ToastContainer
-                position="top-right"
-                autoClose={3000}
-                hideProgressBar={false}
-                newestOnTop={false}
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-            />
-            <h1>Login</h1>
-            <form onSubmit={handleSubmit} style={styles.form}>
-                <div style={styles.inputGroup}>
-                    <label htmlFor="username">Username:</label>
-                    <input
-                        type="text"
-                        id="username"
-                        value={username}
-                        onChange={handleUsernameChange}
-                        style={styles.input}
-                        maxLength={30}
-                    />
-                </div>
-                <div style={styles.inputGroup}>
-                    <label htmlFor="password">Password:</label>
-                    <input
-                        type="password"
-                        id="password"
-                        value={password}
-                        onChange={handlePasswordChange}
-                        style={styles.input}
-                        maxLength={30}
-                    />
-                </div>
-                <button type="submit" style={styles.button}>Login</button>
-            </form>
-            <button onClick={() => window.location.href = '/register'} style={styles.smallButton}>
-                No account? Register
-            </button>
+        <div
+            style={{
+                backgroundImage: `url(${background.src})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+            }}
+        >
+            <div style={styles.container}>
+                <ToastContainer
+                    position="top-right"
+                    autoClose={3000}
+                    hideProgressBar={false}
+                    newestOnTop={false}
+                    closeOnClick
+                    rtl={false}
+                    pauseOnFocusLoss
+                    draggable
+                    pauseOnHover
+                />
+                <h1>Login</h1>
+                <form onSubmit={handleSubmit} style={styles.form}>
+                    <div style={styles.inputGroup}>
+                        <label htmlFor="username">Username:</label>
+                        <input
+                            type="text"
+                            id="username"
+                            value={username}
+                            onChange={handleUsernameChange}
+                            style={styles.input}
+                            maxLength={30}
+                        />
+                    </div>
+                    <div style={styles.inputGroup}>
+                        <label htmlFor="password">Password:</label>
+                        <input
+                            type="password"
+                            id="password"
+                            value={password}
+                            onChange={handlePasswordChange}
+                            style={styles.input}
+                            maxLength={30}
+                        />
+                    </div>
+                    <button type="submit" style={styles.button}>Login</button>
+                </form>
+                <button onClick={() => window.location.href = '/register'} style={styles.smallButton}>
+                    No account? Register
+                </button>
+            </div>
         </div>
     );
 };

@@ -74,6 +74,7 @@ export async function getCoversWithCorners () {
                             covers.id AS cover_id, 
                             covers.points AS cover_points, 
                             JSON_AGG((cornerx, cornery) ORDER BY position) AS corners,
+                            claimant.completion_date AS completion_date,
                             EXISTS (SELECT 1 FROM user_claimed_cover WHERE cover_id = covers.id) AS claimed,
                             EXISTS (SELECT 1 FROM user_completed_cover WHERE cover_id = covers.id) AS completed,
                             claimant.username,
@@ -84,13 +85,13 @@ export async function getCoversWithCorners () {
                         JOIN 
                             has_corner ON covers.id = has_corner.cover_id
                         LEFT JOIN 
-                            (SELECT cover_id, username, info, logo 
+                            (SELECT cover_id, username, info, logo, completion_date
                             FROM user_completed_cover
                             JOIN users ON user_completed_cover.user_id = users.id) AS claimant
                         ON 
                             covers.id = claimant.cover_id
                         GROUP BY 
-                            covers.id, covers.points, claimant.username, claimant.info, claimant.logo
+                            covers.id, covers.points, claimant.username, claimant.info, claimant.logo, claimant.completion_date
                         ORDER BY 
                             covers.id;`;
         

@@ -375,6 +375,7 @@ const Game: React.FC<Props> = () => {
       let cover = await findContainingCover(mousePosition.x, mousePosition.y);
       if (cover !== null && cover !== undefined && cover !== selectedCover) {
         await setSelectedCover(cover);
+        console.log(cover);
         await handleSetClaimant(cover.cover_id);
         await setSelectedCoverChanged(true);
       }
@@ -583,15 +584,16 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
     }
     return (
       <div style={{backgroundColor: `rgba(164, 225, 2, ${coverOpacity})`}}>
-        <p>Points: {(selectedCover as any).cover_points || "Immeasurable"}</p>
+        <p>{(selectedCover as any).cover_points ? "Points:": ""}{(selectedCover as any).cover_points || ""}</p>
         <p style={{fontFamily: 'monospace'}}>
-          Corners: {(selectedCover as any).corners.length == 4 ? JSON.stringify((selectedCover as any).corners)
-            .replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '') : "None"}
+          Corners: {JSON.stringify((selectedCover as any).corners)
+            .replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '')}
         </p>
         <p>{(selectedCover as any).completed ? (
             <div style={{marginTop: '12px'}}>
               Completed by: <br />
               {(selectedCover as any).info ?? 'An Anonymous Hunter'}
+              {" in"} {(selectedCover as any).completion_date?.getFullYear() ?? 'Unknown'}
             </div>
           ) : (
             <>
@@ -847,8 +849,8 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
               <h1 style={sectionHeaderStyle}>{useRegionalLeaderboard ? 'Current' : 'Global'} Leaderboard</h1>
               {leaderboardData.map((player:any) => (
                 <div style={playerStyle}>
-                  <div><span style={playerNameStyle}>{player.name || "Anonymous Hunter"}</span></div>
-                  <div style={playerScoreStyle}>{player.total_points < 0.1 ?  "Immeasurable" : player.total_points}</div>
+                  <div><span style={playerNameStyle}>{player.total_points < 0.1 ? "" : (player.name || "Anonymous Hunter")}</span></div>
+                  <div style={playerScoreStyle}>{player.total_points < 0.1 ?  "" : player.total_points}</div>
                 </div>
               ))}
             </Modal>

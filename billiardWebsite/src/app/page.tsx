@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import 'react-toastify/dist/ReactToastify.css';
-import background from "/public/Geometric-Background-1187.png"; // Ensure this path is correct
+import background from "/public/Geometric-Background-1187.png";
 
 import Game from "./game";
 import { ToastContainer } from "react-toastify";
