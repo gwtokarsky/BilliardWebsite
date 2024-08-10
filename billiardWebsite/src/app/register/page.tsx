@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from 'react';
+import background from "/public/Geometric-Background-1187.png";
 import handle_submit from '../handle_submit';
 
 const RegisterPage: React.FC = () => {
@@ -27,9 +28,13 @@ const RegisterPage: React.FC = () => {
     };
 
     return (
-        <div style={styles.container}>
-            <h1>Register</h1>
+        <div style={{...styles.container,
+            backgroundImage: `url(${background.src})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+        }}>
             <form onSubmit={handleSubmit} style={styles.form}>
+                <h1>Register</h1>
                 <div style={styles.inputGroup}>
                     <label htmlFor="username">Username:</label>
                     <input
@@ -53,7 +58,7 @@ const RegisterPage: React.FC = () => {
                     />
                 </div>
                 <p style={{ fontSize: '10px', textAlign: 'center' }}>
-                    Note: the display name will be shown on completed covers and on the leaderboard
+                    Note: username must be unique, and the name is what will be displayed to other users.
                 </p>
                 <div style={styles.inputGroup}>
                     <label htmlFor="password">Password:</label>
@@ -67,10 +72,10 @@ const RegisterPage: React.FC = () => {
                     />
                 </div>
                 <button type="submit" style={styles.button}>Register</button>
+                <button onClick={() => window.location.href = '/login'} style={styles.smallButton}>
+                    Already registered? Login
+                </button>
             </form>
-            <button onClick={() => window.location.href = '/login'} style={styles.smallButton}>
-                Already registered? Login
-            </button>
         </div>
     );
 };
@@ -82,7 +87,6 @@ const styles = {
         alignItems: 'center',
         justifyContent: 'center',
         height: '100vh',
-        backgroundColor: '#f9f9f9',
         padding: '20px'
     },
     form: {

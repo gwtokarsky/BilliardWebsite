@@ -66,8 +66,8 @@ const LoginPage: React.FC = () => {
                     draggable
                     pauseOnHover
                 />
-                <h1>Login</h1>
                 <form onSubmit={handleSubmit} style={styles.form}>
+                    <h1>Login</h1>
                     <div style={styles.inputGroup}>
                         <label htmlFor="username">Username:</label>
                         <input
@@ -91,10 +91,10 @@ const LoginPage: React.FC = () => {
                         />
                     </div>
                     <button type="submit" style={styles.button}>Login</button>
+                    <button onClick={() => window.location.href = '/register'} style={styles.smallButton}>
+                        No account? Register
+                    </button>
                 </form>
-                <button onClick={() => window.location.href = '/register'} style={styles.smallButton}>
-                    No account? Register
-                </button>
             </div>
         </div>
     );
@@ -107,7 +107,6 @@ const styles = {
         alignItems: 'center',
         justifyContent: 'center',
         height: '100vh',
-        backgroundColor: '#f9f9f9',
         padding: '20px'
     },
     form: {
