@@ -84,6 +84,12 @@ const playerStyle = {
   borderBottom: '1px solid #eee',
 };
 
+const radioStyle = {
+  marginRight: '10px',
+  color: 'gold',
+  textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black',
+};
+
 const playerNameStyle = {
   fontWeight: 'bold',
 };
@@ -142,6 +148,7 @@ const Game: React.FC<Props> = () => {
   const [selectedCoverChanged, setSelectedCoverChanged] = useState(false);
   const [coverOpacity, setCoverOpacity] = useState(1);
   const [useRegionalLeaderboard, setUseRegionalLeaderboard] = useState(true);
+  const [usageType, setUsageType] = useState("Select");
 
   const handleFileChange = (event: any) => {
     const file = event.target.files[0];
@@ -338,10 +345,15 @@ const Game: React.FC<Props> = () => {
         });
     };
 
+    // Add zoom behavior
     const zoomBehavior: any = d3.zoom().on('zoom', (event) => {
       setZoom(event.transform.k);
       setTranslate([event.transform.x, event.transform.y]);
-    });
+    }).filter((event: any) => {
+      // Allow zooming with the mouse wheel or pinch gestures
+      // but disallow dragging and double clicking
+      return event.type === 'wheel' || event.type === 'touchstart' || event.type === 'touchmove' || event.type === 'keydown';
+    });;
 
     // Add zoom behavior
     canvas.call(zoomBehavior);
@@ -370,14 +382,30 @@ const Game: React.FC<Props> = () => {
   }, [covers]);
 
   useEffect(() => {
+    const zoomBehavior: any = d3.zoom().on('zoom', (event) => {
+      setZoom(event.transform.k);
+      setTranslate([event.transform.x, event.transform.y]);
+    });
+
     const handleMouseClick = async (e: MouseEvent) => {
-      console.log(mousePosition);
+      
       let cover = await findContainingCover(mousePosition.x, mousePosition.y);
       if (cover !== null && cover !== undefined && cover !== selectedCover) {
-        await setSelectedCover(cover);
-        console.log(cover);
-        await handleSetClaimant(cover.cover_id);
-        await setSelectedCoverChanged(true);
+        if (usageType == "Select") {
+          await setSelectedCover(cover);
+          await handleSetClaimant(cover.cover_id);
+          await setSelectedCoverChanged(true);
+        } 
+      }
+      if (usageType == "Zoom In") {
+        //zoom with d3 to mouse
+        d3.select(canvasRef.current).transition().call(zoomBehavior.scaleBy, 2);
+      } else if (usageType == "Zoom Out") {
+        //zoom with d3
+        await d3.select(canvasRef.current).transition().call(zoomBehavior.scaleBy, 0.5);
+      }
+      else if (usageType == "Move To") {
+        await d3.select(canvasRef.current).transition().call(zoomBehavior.translateTo, mousePosition.x / 180 * scale, (180 - mousePosition.y) / 180 * scale);
       }
     };
     canvasRef.current!.removeEventListener('click', handleMouseClick);
@@ -422,6 +450,8 @@ const Game: React.FC<Props> = () => {
     });
     return maxDistance;
   };
+
+  
 
   const render = () => {
     // Get canvas context
@@ -724,12 +754,10 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
 
   // if cover text is shaded, decrease the opacity of the cover slowly
   useEffect(() => {
-    console.log(coverOpacity);
     setCoverOpacity(1);
   
     const interval = setInterval(() => {
       setCoverOpacity((prevOpacity) => {
-        console.log(prevOpacity);
         const newOpacity = prevOpacity - 0.1;
         if (newOpacity <= 0) {
           clearInterval(interval);
@@ -793,7 +821,7 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
               {completedCovers.map((cover:any) => (
                 <div style={playerStyle}>
                   <div><span style={playerNameStyle}>{JSON.stringify(cover.corners).replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '')}</span></div>
-                  <div style={playerScoreStyle}>{cover.completion_date.toLocaleDateString('en-US', dateOptions)}</div>
+                  <div style={playerScoreStyle}>{cover.completion_date.getFullYear()}</div>
                   <div style={playerScoreStyle}>{cover.points}</div>
                 </div>
               ))}
@@ -805,7 +833,26 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
             {getCoverInfo()}           
           </div>
         </div>
+        
         <div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+            <label style={radioStyle}>
+              <input type="radio" id="select" name="zoom" value="select" checked={usageType === "Select"} onChange={() => setUsageType("Select")}/>
+              Select
+            </label>
+            <label style={radioStyle}>
+              <input type="radio" id="zoomIn" name="zoom" value="zoomIn" checked={usageType === "Zoom In"} onChange={() => setUsageType("Zoom In")}/>
+              Zoom In
+            </label>
+            <label style={radioStyle}>
+              <input type="radio" id="zoomOut" name="zoom" value="zoomOut" checked={usageType === "Zoom Out"} onChange={() => setUsageType("Zoom Out")}/>
+              Zoom Out
+            </label>
+            <label style={radioStyle}>
+              <input type="radio" id="moveTo" name="zoom" value="moveTo" checked={usageType === "Move To"} onChange={() => setUsageType("Move To")}/>
+              Move To
+            </label>
+          </div>
           <canvas 
             ref={canvasRef}
             width={scale}
@@ -860,7 +907,7 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
             {recentCompletions.slice(0, 3).map((completion:any, index) => (
               <div key={index} style={playerStyle}>
                 <div><span style={playerNameStyle}>{completion.name || "Anonymous Hunter"}</span></div>
-                <div style={{ color: '#666' }}>{completion.date.toLocaleDateString('en-US', dateOptions)}</div>
+                <div style={{ color: '#666' }}>{completion.date.getFullYear()}</div>
               </div>
             ))}
             <button style={buttonStyle} onClick={() => setIsCompletionsModalOpen(true)}>
@@ -872,7 +919,7 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
               {recentCompletions.map((completion:any, index) => (
                 <div key={index} style={playerStyle}>
                   <div><span style={playerNameStyle}>{completion.name || "Anonymous Hunter"}</span></div>
-                  <div style={{ color: '#666' }}>{completion.date.toLocaleDateString('en-US', dateOptions)}</div>
+                  <div style={{ color: '#666' }}>{completion.date.getFullYear()}</div>
                 </div>
               ))}
             </Modal>
