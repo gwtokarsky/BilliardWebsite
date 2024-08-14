@@ -108,6 +108,7 @@ const sectionStyle = {
   borderRadius: '8px',
   boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
   backgroundColor: '#f9f9f9',
+  minWidth: '300px',
 };
 
 const sectionHeaderStyle = {
@@ -399,10 +400,10 @@ const Game: React.FC<Props> = () => {
       }
       if (usageType == "Zoom In") {
         //zoom with d3 to mouse
-        d3.select(canvasRef.current).transition().call(zoomBehavior.scaleBy, 2);
+        await d3.select(canvasRef.current).transition().call(zoomBehavior.translateTo, mousePosition.x / 180 * scale, (180 - mousePosition.y) / 180 * scale).transition().call(zoomBehavior.scaleBy, 2);
       } else if (usageType == "Zoom Out") {
         //zoom with d3
-        await d3.select(canvasRef.current).transition().call(zoomBehavior.scaleBy, 0.5);
+        await d3.select(canvasRef.current).transition().call(zoomBehavior.translateTo, mousePosition.x / 180 * scale, (180 - mousePosition.y) / 180 * scale).transition().call(zoomBehavior.scaleBy, 0.5);
       }
       else if (usageType == "Move To") {
         await d3.select(canvasRef.current).transition().call(zoomBehavior.translateTo, mousePosition.x / 180 * scale, (180 - mousePosition.y) / 180 * scale);
@@ -616,8 +617,9 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
       <div style={{backgroundColor: `rgba(164, 225, 2, ${coverOpacity})`}}>
         <p>{(selectedCover as any).cover_points ? "Points:": ""}{(selectedCover as any).cover_points || ""}</p>
         <p style={{fontFamily: 'monospace'}}>
-          Corners: {JSON.stringify((selectedCover as any).corners)
-            .replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '')}
+          <pre>Corners: {'\n' + JSON.stringify((selectedCover as any).corners)
+            .replace(/"f1"/g, "").replace(/,/g, "").replace(/"f2"/g, ",").replaceAll('}{', ' ').replaceAll(/[\{\}\[\]:]/g, '').replaceAll(' ', '\n')}
+          </pre>
         </p>
         <p>{(selectedCover as any).completed ? (
             <div style={{marginTop: '12px'}}>
@@ -828,7 +830,7 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
             </Modal>
             <button onClick={logout} style={redButtonStyle}>Logout</button>
           </div>
-          <div style={sectionStyle}>
+          <div style={{...sectionStyle, minHeight: '300px',}}>
             <div style={sectionHeaderStyle}>Cover Info</div>
             {getCoverInfo()}           
           </div>

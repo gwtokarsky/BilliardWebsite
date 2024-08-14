@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Billiard Website, To be named",
+  title: "The Great Periodic Path Hunt Game",
   description: "For the Great Periodic Path Hunt",
 };
 
