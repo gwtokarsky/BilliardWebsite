@@ -24,6 +24,7 @@ def main():
         print("dc to delete a cover, dr to delete a region,")
         print("o to complete a cover manually, (NOT IMPLEMENTED) x to manage cover completion requests,")
         print("sc to select all covers, sr to select all regions, su to select all users,")
+        print("y to change cover corners,")
         print("q to quit")
 
         while True:
@@ -81,7 +82,17 @@ def main():
             elif choice == 'q':
                 cursor.close()
                 conn.close()
-                break
+            elif choice == 'y':
+                cover_id = int(input("Enter the cover id: "))
+                corners_input = input("Enter the new corners: ")
+                corners_string = corners_input.replace(',', ' ').split(" ")
+                try:
+                    corners = [(float(corners_string[i]), float(corners_string[i+1])) for i in range(0, len(corners_string), 2)]
+                    set_new_cover_corners(cover_id, corners, cursor)
+                    conn.commit()
+                except ValueError:
+                    print(corners_string)
+                    print("Invalid input")
             else:
                 print("Invalid input")
 
@@ -323,5 +334,13 @@ def delete_all_claimants_of_cover(cover_id, cursor):
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error deleting claimants:", error)
 
+def set_new_cover_corners(cover_id, corners, cursor):
+    try:       
+        cursor.execute("DELETE FROM has_corner WHERE cover_id = %s", (cover_id,))
+        for i in range(len(corners)):
+            cursor.execute("INSERT INTO has_corner (cover_id, cornerx, cornery, position) VALUES (%s, %s, %s, %s)", (cover_id, corners[i][0], corners[i][1], i))
+        print("Cover corners updated successfully")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error updating cover corners:", error)
 
 main()
