@@ -93,6 +93,22 @@ def main():
                 except ValueError:
                     print(corners_string)
                     print("Invalid input")
+            elif choice == 'split':
+                c_input = input("Enter the points of the cover: ")
+                c_corners_string = c_input.replace(',', ' ').split(" ")
+                try:
+                    corners = [(float(c_corners_string[i]), float(c_corners_string[i+1])) for i in range(0, len(c_corners_string), 2)]
+                    x = float(input("Enter the x dimension: "))
+                    y = float(input("Enter the y dimension: "))
+                    max_decimals = int(input("Enter the maximum number of decimals: "))
+                    x = round(x, max_decimals)
+                    y = round(y, max_decimals)
+                    covers = split_cover(corners, x, y)
+            
+                    for cover in covers:
+                        print(str(cover).replace('((', '').replace('),', ' ,').replace('(','').replace(', ',',').replace(' ,', ' ').replace('))', ''))
+                except ValueError:
+                    print("Invalid input")
             else:
                 print("Invalid input")
 
@@ -342,5 +358,28 @@ def set_new_cover_corners(cover_id, corners, cursor):
         print("Cover corners updated successfully")
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error updating cover corners:", error)
+
+def split_cover(corners, x, y):
+    # Calculate the width and height of the parallelogram
+    width = abs(corners[1][0] - corners[0][0])
+    height = abs(corners[1][1] - corners[2][1])
+    # Calculate the number of chunks in each dimension
+    num_chunks_x = round(width // x)
+    num_chunks_y = round(height // y)
+    print("Num chunks x:", num_chunks_x)
+    # Create a list to store the chunks
+    chunks = []
+    for i in range(num_chunks_x):
+        # Calculate the starting x-coordinate of the current column
+        start_x = corners[1][0] - i * x
+        # Iterate over the chunks in the y direction (top to bottom)
+        for j in range(num_chunks_y):
+            # Calculate the starting y-coordinate of the current chunk
+            start_y = corners[1][1] + i * x - j * y
+            
+            # Append the coordinates of the current chunk to the list
+            chunks.append(((start_x - x, start_y + x * y),(start_x, start_y),(start_x, start_y - y), (start_x - x, start_y + x * y - y)))
+    
+    return chunks
 
 main()
