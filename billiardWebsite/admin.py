@@ -103,23 +103,33 @@ def main():
                     max_decimals = int(input("Enter the maximum number of decimals: "))
                     x = round(x, max_decimals)
                     y = round(y, max_decimals)
-                    covers = split_cover(corners, x, y)
+                    covers = split_cover(corners, x, y, max_decimals)
             
                     for cover in covers:
                         print(str(cover).replace('((', '').replace('),', ' ,').replace('(','').replace(', ',',').replace(' ,', ' ').replace('))', ''))
                 except ValueError:
                     print("Invalid input")
+            elif choice == 'scr':
+                region_id = int(input("Enter the region id: "))
+                select_covers_by_region(region_id, cursor)
+                conn.commit()
+            elif choice == 'cd':
+                cover_id = int(input("Enter the cover id: "))
+                date = input("Enter the new date: ")
+                change_completion_date(cover_id, date, cursor)
+                conn.commit()
             else:
                 print("Invalid input")
 
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error connecting to database:", error)
 
-def create_region(corners, points, color, cursor):
+def create_region(corners, points, color, cursor, danger=False):
     try:
         polygon = Polygon(corners)
         
-        validate_region(polygon, cursor)
+        if not danger:
+            validate_region(polygon, cursor)
         
         cursor.execute("INSERT INTO region (color, points) VALUES (%s, %s) RETURNING id", (color, points))
         region_id = cursor.fetchone()[0]
@@ -136,11 +146,12 @@ def create_region(corners, points, color, cursor):
 
 
 
-def create_cover(corners, region_id, cursor):
+def create_cover(corners, region_id, cursor, danger=False):
     try:
         cover = Polygon(corners)
 
-        validate_cover(cover, region_id, cursor)
+        if not danger:
+            validate_cover(cover, region_id, cursor)
         
         cursor.execute("SELECT points FROM region WHERE id = %s", (region_id,))
          
@@ -327,6 +338,7 @@ def select_all_covers(cursor):
             corners = cursor.fetchall()
             corners_str = ' '.join([f"{x},{y}" for x, y in corners])
             print("Corners:", corners_str)
+            print()
 
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error selecting all covers:", error)
@@ -359,27 +371,46 @@ def set_new_cover_corners(cover_id, corners, cursor):
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error updating cover corners:", error)
 
-def split_cover(corners, x, y):
+def split_cover(corners, x, y, max_decimals):
     # Calculate the width and height of the parallelogram
-    width = abs(corners[1][0] - corners[0][0])
-    height = abs(corners[1][1] - corners[2][1])
+    width = round(abs(corners[1][0] - corners[0][0]), max_decimals)
+    height = round(abs(corners[1][1] - corners[2][1]), max_decimals)
     # Calculate the number of chunks in each dimension
     num_chunks_x = round(width // x)
     num_chunks_y = round(height // y)
-    print("Num chunks x:", num_chunks_x)
     # Create a list to store the chunks
     chunks = []
     for i in range(num_chunks_x):
         # Calculate the starting x-coordinate of the current column
-        start_x = corners[1][0] - i * x
+        start_x = round(corners[1][0] - i * x, max_decimals)
         # Iterate over the chunks in the y direction (top to bottom)
         for j in range(num_chunks_y):
             # Calculate the starting y-coordinate of the current chunk
-            start_y = corners[1][1] + i * x - j * y
-            
+            start_y = round(corners[1][1] + i * x - j * y, max_decimals)
             # Append the coordinates of the current chunk to the list
-            chunks.append(((start_x - x, start_y + x * y),(start_x, start_y),(start_x, start_y - y), (start_x - x, start_y + x * y - y)))
+            chunks.append(((round(start_x - x,max_decimals), round(start_y + y,max_decimals)),(start_x, start_y),(start_x, round(start_y - y,max_decimals)), (round(start_x - x,max_decimals), start_y )))
     
     return chunks
+
+def change_completion_date(cover_id, date, cursor):
+    try:
+        cursor.execute("UPDATE user_completed_cover SET completion_date = %s WHERE cover_id = %s", (date, cover_id))
+        print("Completion date updated successfully")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error updating completion date:", error)
+
+def select_covers_by_region(region_id, cursor):
+    try:
+        cursor.execute("SELECT * FROM covers WHERE id IN (SELECT cover_id FROM cover_in_region WHERE region_id = %s)", (region_id,))
+        rows = cursor.fetchall()
+        for row in rows:
+            print(f"ID: {row[0]}, Points: {row[1]}")
+            cursor.execute("SELECT cornerx, cornery FROM has_corner WHERE cover_id = %s ORDER BY POSITION ASC", (row[0],))
+            corners = cursor.fetchall()
+            corners_str = ' '.join([f"{x},{y}" for x, y in corners])
+            print("Corners:", corners_str)
+            print()
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error selecting covers by region:", error)   
 
 main()
