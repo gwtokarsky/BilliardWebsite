@@ -100,10 +100,11 @@ def main():
                     corners = [(float(c_corners_string[i]), float(c_corners_string[i+1])) for i in range(0, len(c_corners_string), 2)]
                     x = float(input("Enter the x dimension: "))
                     y = float(input("Enter the y dimension: "))
-                    max_decimals = int(input("Enter the maximum number of decimals: "))
-                    x = round(x, max_decimals)
-                    y = round(y, max_decimals)
-                    covers = split_cover(corners, x, y, max_decimals)
+                    max_decimals_x = int(input("Enter the maximum number of decimals for x: "))
+                    max_decimals_y = int(input("Enter the maximum number of decimals for y: "))
+                    x = round(x, max_decimals_x)
+                    y = round(y, max_decimals_y)
+                    covers = split_cover(corners, x, y, max_decimals_x, max_decimals_y)
             
                     for cover in covers:
                         print(str(cover).replace('((', '').replace('),', ' ,').replace('(','').replace(', ',',').replace(' ,', ' ').replace('))', ''))
@@ -118,6 +119,43 @@ def main():
                 date = input("Enter the new date: ")
                 change_completion_date(cover_id, date, cursor)
                 conn.commit()
+            elif choice == 'cdanger':
+                c_input = input("Enter the points of the cover: ")
+                c_corners_string = c_input.replace(',', ' ').split(" ")
+                try:
+                    c_corners = [(float(c_corners_string[i]), float(c_corners_string[i+1])) for i in range(0, len(c_corners_string), 2)]
+                    region_id = int(input("Enter the region id to add the cover to: "))
+                    create_cover(c_corners, region_id, cursor, True)
+                    conn.commit()
+                except ValueError:
+                    print("Invalid input")
+            elif choice == 'rdanger':
+                r_input = input("Enter the points of the region: ")
+                r_corners_string = r_input.replace(',', ' ').split(" ")
+                try:
+                    r_corners = [(float(r_corners_string[i]), float(r_corners_string[i+1])) for i in range(0, len(r_corners_string), 2)]
+                    r_points = int(input("Enter the number of points for each cover in the region: "))
+                    color = input("Enter the color of the region: ")
+                    create_region(r_corners, r_points, color, cursor, True)
+                    conn.commit()
+                except ValueError:
+                    print("Invalid input")
+            elif choice == 'crb':
+                region_id = int(input("Enter the region id: "))
+                corners_input = input("Enter the new corners: ")
+                corners_string = corners_input.replace(',', ' ').split(" ")
+                try:
+                    corners = [(float(corners_string[i]), float(corners_string[i+1])) for i in range(0, len(corners_string), 2)]
+                    change_region_bounds(region_id, corners, cursor)
+                    conn.commit()
+                except ValueError:
+                    print(corners_string)
+                    print("Invalid input")
+            elif choice == 'cdr':
+                region_id = int(input("Enter the region id: "))
+                date = input("Enter the new date: ")
+                change_date_per_region(region_id, date, cursor)
+                conn.commit()
             else:
                 print("Invalid input")
 
@@ -126,9 +164,8 @@ def main():
 
 def create_region(corners, points, color, cursor, danger=False):
     try:
-        polygon = Polygon(corners)
-        
         if not danger:
+            polygon = Polygon(corners)
             validate_region(polygon, cursor)
         
         cursor.execute("INSERT INTO region (color, points) VALUES (%s, %s) RETURNING id", (color, points))
@@ -182,7 +219,7 @@ def create_covers_from_file( cover_file, region_id, cursor):
         cover_lines = [line.strip() for line in cover_lines]
         for line in cover_lines:
             corners = line.replace(',', ' ').split(" ")
-            corners = [(int(corners[i]), int(corners[i+1])) for i in range(0, len(corners), 2)]
+            corners = [(float(corners[i]), float(corners[i+1])) for i in range(0, len(corners), 2)]
             create_cover(corners, region_id, cursor)
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error creating region:", error)
@@ -371,10 +408,10 @@ def set_new_cover_corners(cover_id, corners, cursor):
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error updating cover corners:", error)
 
-def split_cover(corners, x, y, max_decimals):
+def split_cover(corners, x, y, max_decimals_x, max_decimals_y):
     # Calculate the width and height of the parallelogram
-    width = round(abs(corners[1][0] - corners[0][0]), max_decimals)
-    height = round(abs(corners[1][1] - corners[2][1]), max_decimals)
+    width = round(abs(corners[1][0] - corners[0][0]), max_decimals_x)
+    height = round(abs(corners[1][1] - corners[2][1]), max_decimals_y)
     # Calculate the number of chunks in each dimension
     num_chunks_x = round(width // x)
     num_chunks_y = round(height // y)
@@ -382,13 +419,13 @@ def split_cover(corners, x, y, max_decimals):
     chunks = []
     for i in range(num_chunks_x):
         # Calculate the starting x-coordinate of the current column
-        start_x = round(corners[1][0] - i * x, max_decimals)
+        start_x = round(corners[1][0] - i * x, max_decimals_x)
         # Iterate over the chunks in the y direction (top to bottom)
         for j in range(num_chunks_y):
             # Calculate the starting y-coordinate of the current chunk
-            start_y = round(corners[1][1] + i * x - j * y, max_decimals)
+            start_y = round(corners[1][1] + i * x - j * y, max_decimals_y)
             # Append the coordinates of the current chunk to the list
-            chunks.append(((round(start_x - x,max_decimals), round(start_y + y,max_decimals)),(start_x, start_y),(start_x, round(start_y - y,max_decimals)), (round(start_x - x,max_decimals), start_y )))
+            chunks.append(((round(start_x - x,max_decimals_x), round(start_y + x,max_decimals_y)),(start_x, start_y),(start_x, round(start_y - y,max_decimals_y)), (round(start_x - x,max_decimals_x), round(start_y + x - y,max_decimals_y))))
     
     return chunks
 
@@ -412,5 +449,21 @@ def select_covers_by_region(region_id, cursor):
             print()
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error selecting covers by region:", error)   
+
+def change_region_bounds(region_id, corners, cursor):
+    try:
+        cursor.execute("DELETE FROM region_has_corner WHERE region_id = %s", (region_id,))
+        for i in range(len(corners)):
+            cursor.execute("INSERT INTO region_has_corner (region_id, cornerx, cornery, position) VALUES (%s, %s, %s, %s)", (region_id, corners[i][0], corners[i][1], i))
+        print("Region bounds updated successfully")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error updating region bounds:", error)
+
+def change_date_per_region(region_id, date, cursor):
+    try:
+        cursor.execute("UPDATE user_completed_cover SET completion_date = %s WHERE cover_id IN (SELECT cover_id FROM cover_in_region WHERE region_id = %s)", (date, region_id))
+        print("Date updated successfully")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error updating date:", error)
 
 main()

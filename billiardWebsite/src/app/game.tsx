@@ -337,8 +337,12 @@ const Game: React.FC<Props> = () => {
         const relativeY = e.clientY - rect.top;
 
         // Adjust mouse position based on scale factor
-        const adjustedX = (relativeX - translate[0]) / canvasSize * 180 / zoom;
-        const adjustedY = 180 - (relativeY - translate[1]) / canvasSize * 180 / zoom;
+        const adjustedXt = (relativeX - translate[0]) / canvasSize * 180 / zoom;
+        const adjustedYt = 180 - (relativeY - translate[1]) / canvasSize * 180 / zoom;
+
+        //adjust the mouse so that its on the pointer of the mouse instead of the center of the mouse
+        const adjustedX = adjustedXt - 2 / zoom;
+        const adjustedY = adjustedYt + 2 / zoom;
 
         setMousePosition({ 
         x: adjustedX,
@@ -480,15 +484,13 @@ const Game: React.FC<Props> = () => {
       });
       context.closePath();
       context.fillStyle = polygon.fillColor ?? 'transparent';
-      context.lineWidth = Math.min(0.5, 8 / zoom);
+      context.lineWidth = Math.min(0.5, 2 / zoom);
       context.strokeStyle = 'black';
 
       if (polygon.stroke == 'maroon') {
-        context.lineWidth /= 10000;
         context.fillStyle = 'rgba(128, 0, 0, 1)';
       } 
       else if (polygon.stroke == 'yellow') {
-        context.lineWidth /= 10000;
         context.fillStyle = 'rgba(255, 255, 0, 1)';
       }
 
@@ -852,7 +854,7 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
             </label>
             <label style={radioStyle}>
               <input type="radio" id="moveTo" name="zoom" value="moveTo" checked={usageType === "Move To"} onChange={() => setUsageType("Move To")}/>
-              Move To
+              Center
             </label>
           </div>
           <canvas 
