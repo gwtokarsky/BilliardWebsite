@@ -439,7 +439,7 @@ const Game: React.FC<Props> = () => {
           }
           else {
             const date = new Date(cover.completion_date);
-            date.setHours(date.getHours() + 12);
+            date.setHours(date.getHours() + 1);
             setCompletionDate(date);
           }
           
