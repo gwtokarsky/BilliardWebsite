@@ -8,6 +8,7 @@ import { ToastContainer } from "react-toastify";
 
 export default function Home() {
   const [userID, setUserID] = useState("");
+  const [windowScale, setWindowScale] = useState(1);
 
   useEffect(() => {
     const getUserIDFromURL = () => {
@@ -16,19 +17,32 @@ export default function Home() {
     };
 
     setUserID(getUserIDFromURL() ?? "");
+    window.addEventListener("resize", () => {
+      setWindowScale(window.innerWidth / 800);
+    });
   }, []);
 
   return (
-    <main
-      className="flex min-h-screen flex-col items-center justify-between p-24"
-      style={{
-        backgroundImage: `url(${background.src})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center'
-      }}
-    >
-      <Game user_id={userID} />
-      <ToastContainer />
-    </main>
+    <div className="flex flex-col">
+      <main
+        className="flex-1 flex flex-col items-center justify-between p-0"
+        style={{
+          backgroundImage: `url(${background.src})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          width: '100%',
+          minHeight: '100vh',
+        }}
+      >
+      <div style={{ transform: `scale(${windowScale})` }} />
+        <Game user_id={userID} />
+        <ToastContainer />
+      </main>
+      <footer className="w-full py-4 bg-gray-900 text-white text-center shadow-md mt-auto">
+        <div className="container mx-auto px-6" >
+          <p>The Great Periodic Path Hunt Game by George Tokarsky and Kaiden Mastel</p>
+        </div>
+      </footer>
+    </div>
   );
 }

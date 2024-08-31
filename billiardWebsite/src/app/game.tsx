@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import * as d3 from 'd3';
 import { Console } from 'console';
-import { getCoversWithCorners, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants, setLogoForUser, updateInfoForUser, getInfoForUser, getLogoForUser, getUserIdFromCookie, getDefaultLogo, getLeaderboardForRegion} from '@/actions/actions';
+import { getCoversWithCorners, getFlares, getRegionsWithCorners, claimCover, getUser, getUsernameFromId, deleteAllSessionsForUser, getClaimedCoversForUser, getLeaderboard, getMostRecentCompletionData, getCompletedCoversForUser, getUserPoints, getAllClaimants, setLogoForUser, updateInfoForUser, getInfoForUser, getLogoForUser, getUserIdFromCookie, getDefaultLogo, getLeaderboardForRegion} from '@/actions/actions';
 import { ToastContainer, toast } from 'react-toastify';
 import { get } from 'http';
 import Modal from './modal';
@@ -18,7 +18,11 @@ interface Polygon {
   flipHorizontal: boolean;
 }
 
-const dateOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+const dateOptions: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric'
+};
 
 const containerStyle = {
   display: 'flex',
@@ -108,7 +112,8 @@ const sectionStyle = {
   borderRadius: '8px',
   boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
   backgroundColor: '#f9f9f9',
-  minWidth: '300px',
+  minWidth: '240px',
+  fontSize: '0.7em',
 };
 
 const sectionHeaderStyle = {
@@ -150,6 +155,14 @@ const Game: React.FC<Props> = () => {
   const [coverOpacity, setCoverOpacity] = useState(1);
   const [useRegionalLeaderboard, setUseRegionalLeaderboard] = useState(true);
   const [usageType, setUsageType] = useState("Select");
+  const [flares, setFlares] = useState([]);
+  const [isFlaresModalOpen, setIsFlaresModalOpen] = useState(false);
+  const [flareDescription, setFlareDescription] = useState("");
+  const [flareTitle, setFlareTitle] = useState("");
+  const [flareX, setFlareX] = useState(0);
+  const [flareY, setFlareY] = useState(0);
+  const [windowInnerwidth, setWindowInnerWidth] = useState(0);
+  const [completionDate, setCompletionDate] = useState<Date | null>(null);
 
   const handleFileChange = (event: any) => {
     const file = event.target.files[0];
@@ -181,6 +194,8 @@ const Game: React.FC<Props> = () => {
     await setLeaderboardData(leaderboard);
     const recentCompletions = await getMostRecentCompletionData();
     await setRecentCompletions(recentCompletions);
+    const f = await getFlares();
+    await setFlares(f);
   };
 
   const getRegions = async () => {
@@ -322,6 +337,8 @@ const Game: React.FC<Props> = () => {
     return containing_cover;
   };
 
+  
+
 
   useEffect(() => {
     const canvasSize = Math.min(window.innerWidth, window.innerHeight) / 1.5;
@@ -393,11 +410,39 @@ const Game: React.FC<Props> = () => {
     });
 
     const handleMouseClick = async (e: MouseEvent) => {
-      
+
+      flares.forEach((flare: any) => {
+        let z = 180 - mousePosition.x - mousePosition.y;
+        if ((Math.abs(flare.x - mousePosition.x) < flare.radius && Math.abs(flare.y - mousePosition.y) < flare.radius) ||
+            (Math.abs(flare.x - mousePosition.x) < flare.radius && Math.abs(flare.y - z) < flare.radius) ||
+            (Math.abs(flare.x - z) < flare.radius && Math.abs(flare.y - mousePosition.y) < flare.radius) ||
+            (Math.abs(flare.x - mousePosition.y) < flare.radius && Math.abs(flare.y - mousePosition.x) < flare.radius) ||
+            (Math.abs(flare.x - z) < flare.radius && Math.abs(flare.y - mousePosition.x) < flare.radius) ||
+            (Math.abs(flare.x - mousePosition.y) < flare.radius && Math.abs(flare.y - z) < flare.radius)){
+          if (usageType == "Select") {
+            setIsFlaresModalOpen(true);
+            setFlareDescription(flare.description);
+            setFlareTitle(flare.title);
+            setFlareX(flare.x);
+            setFlareY(flare.y);
+          }
+        }
+      });
+          
       let cover = await findContainingCover(mousePosition.x, mousePosition.y);
       if (cover !== null && cover !== undefined && cover !== selectedCover) {
         if (usageType == "Select") {
+          
           await setSelectedCover(cover);
+          if (cover.completion_date == null) {
+            setCompletionDate(null); 
+          }
+          else {
+            const date = new Date(cover.completion_date);
+            date.setHours(date.getHours() + 12);
+            setCompletionDate(date);
+          }
+          
           await handleSetClaimant(cover.cover_id);
           await setSelectedCoverChanged(true);
         } 
@@ -422,6 +467,11 @@ const Game: React.FC<Props> = () => {
 
   useEffect(() => {
     loadRegions();
+    window.addEventListener('resize', () => {
+      setWindowInnerWidth(window.innerWidth);
+    }
+    );
+    setWindowInnerWidth(window.innerWidth);
   }
   , []);
 
@@ -544,11 +594,12 @@ const Game: React.FC<Props> = () => {
         
         // Draw the image
         context.drawImage(src, 0, 0);
-        
+
         // Restore the context to remove the transformation
         context.restore();
       }
     });
+
 
     // Reset transformations to draw fixed text
     context.restore();
@@ -627,12 +678,12 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
             <div style={{marginTop: '12px'}}>
               Completed by: <br />
               {(selectedCover as any).info ?? 'An Anonymous Hunter'}
-              {" in"} {(selectedCover as any).completion_date?.getFullYear() ?? 'Unknown'}
+              {" On"} {completionDate?.toLocaleDateString('en-US', dateOptions) ?? 'Unknown Date'}
             </div>
           ) : (
             <>
               Incomplete <br />
-              <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center'}}>
+              <div style={{ display: 'flex', alignItems: 'center'}}>
               <p>
                   <button
                     style={buttonStyle}
@@ -650,7 +701,14 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
                             toast("You have already claimed two covers", { type: "error" })
                           }
                           else {
-                            toast("You have already claimed this cover", { type: "error" })  
+                            let claimantIds = claimants.map((claimant: any) => claimant.user_id);
+                            if (claimantIds.includes(userId)) {
+                              toast("You have already claimed this cover", { type: "error" })  
+                            }
+                            else {
+                              //redirect to login page
+                              window.location.href = '/login';
+                            }
                           }
                         }
                       }
@@ -832,8 +890,8 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
             </Modal>
             <button onClick={logout} style={redButtonStyle}>Logout</button>
           </div>
-          <div style={{...sectionStyle, minHeight: '300px',}}>
-            <div style={sectionHeaderStyle}>Cover Info</div>
+          <div style={{...sectionStyle, minHeight: '240px',}}>
+            <div style={sectionHeaderStyle}>Cover Info {(selectedCover as any)?.cover_id == null ? "" :  "- ID: " + (selectedCover as any)?.cover_id}</div>
             {getCoverInfo()}           
           </div>
         </div>
@@ -865,73 +923,81 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
           />
         </div>
         <div style={{display: 'flex', flexDirection: 'column'}}>
-          <div style={sectionStyle}>
-            <div style={sectionHeaderStyle}>{useRegionalLeaderboard ? 'Current' : 'Global'} Leaderboard</div>
-            {leaderboardData.slice(0, 3).map((player:any) => (
-            <div style={playerStyle}>
-              <div><span style={playerNameStyle}>{player.name || "Anonymous Hunter"}</span></div>
-              <div style={playerScoreStyle}>{player.total_points}</div>
-            </div>
-            ))}
-            <button style={{...buttonStyle, marginRight: 10}} onClick={() => setIsModalOpen(true)}>
-              View More
-            </button>
-
-            <button 
-              style={buttonStyle} 
-              onClick={() => {
-                if (useRegionalLeaderboard) {
-                  getLeaderboard().then((res) => {
-                    setLeaderboardData(res);
-                    setUseRegionalLeaderboard(!useRegionalLeaderboard);
-                  });
-                } else {
-                  getLeaderboardForRegion().then((res) => {
-                    setLeaderboardData(res);
-                    setUseRegionalLeaderboard(!useRegionalLeaderboard);
-                  });
-                }
-              }}
-            >
-              Use {useRegionalLeaderboard ? 'Global' : 'Current'} Leaderboard
-            </button>
-
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-              <h1 style={sectionHeaderStyle}>{useRegionalLeaderboard ? 'Current' : 'Global'} Leaderboard</h1>
-              {leaderboardData.map((player:any) => (
-                <div style={playerStyle}>
-                  <div><span style={playerNameStyle}>{player.total_points < 0.1 ? "" : (player.name || "Anonymous Hunter")}</span></div>
-                  <div style={playerScoreStyle}>{player.total_points < 0.1 ?  "" : player.total_points}</div>
-                </div>
-              ))}
-            </Modal>
-          </div>
-          <div style={sectionStyle}>
-            <div style={sectionHeaderStyle}>Most Recent Completions</div>
-            {recentCompletions.slice(0, 3).map((completion:any, index) => (
-              <div key={index} style={playerStyle}>
-                <div><span style={playerNameStyle}>{completion.name || "Anonymous Hunter"}</span></div>
-                <div style={{ color: '#666' }}>{completion.date.getFullYear()}</div>
+          <div style={windowInnerwidth < scale + 710 ? {display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center'} : {flexWrap: 'nowrap'}}>
+            <div style={sectionStyle}>
+              <div style={sectionHeaderStyle}>{useRegionalLeaderboard ? 'Current' : 'Global'} Leaderboard</div>
+              {leaderboardData.slice(0, 3).map((player:any) => (
+              <div style={playerStyle}>
+                <div><span style={playerNameStyle}>{player.name || "Anonymous Hunter"}</span></div>
+                <div style={playerScoreStyle}>{player.total_points}</div>
               </div>
-            ))}
-            <button style={buttonStyle} onClick={() => setIsCompletionsModalOpen(true)}>
-              View More
-            </button>
+              ))}
+              <button style={{...buttonStyle, marginRight: 10}} onClick={() => setIsModalOpen(true)}>
+                View More
+              </button>
 
-            <Modal isOpen={isCompletionsModalOpen} onClose={() => setIsCompletionsModalOpen(false)}>
-              <h1 style={sectionHeaderStyle}>Recent Completions</h1>
-              {recentCompletions.map((completion:any, index) => (
+              <button 
+                style={buttonStyle} 
+                onClick={() => {
+                  if (useRegionalLeaderboard) {
+                    getLeaderboard().then((res) => {
+                      setLeaderboardData(res);
+                      setUseRegionalLeaderboard(!useRegionalLeaderboard);
+                    });
+                  } else {
+                    getLeaderboardForRegion().then((res) => {
+                      setLeaderboardData(res);
+                      setUseRegionalLeaderboard(!useRegionalLeaderboard);
+                    });
+                  }
+                }}
+              >
+                Use {useRegionalLeaderboard ? 'Global' : 'Current'} Leaderboard
+              </button>
+
+              <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+                <h1 style={sectionHeaderStyle}>{useRegionalLeaderboard ? 'Current' : 'Global'} Leaderboard</h1>
+                {leaderboardData.map((player:any) => (
+                  <div style={playerStyle}>
+                    <div><span style={playerNameStyle}>{player.total_points < 0.1 ? "" : (player.name || "Anonymous Hunter")}</span></div>
+                    <div style={playerScoreStyle}>{player.total_points < 0.1 ?  "" : player.total_points}</div>
+                  </div>
+                ))}
+              </Modal>
+            </div>
+            <div style={sectionStyle}>
+              <div style={sectionHeaderStyle}>Most Recent Completions</div>
+              {recentCompletions.slice(0, 3).map((completion:any, index) => (
                 <div key={index} style={playerStyle}>
                   <div><span style={playerNameStyle}>{completion.name || "Anonymous Hunter"}</span></div>
                   <div style={{ color: '#666' }}>{completion.date.getFullYear()}</div>
                 </div>
               ))}
-            </Modal>
+              <button style={buttonStyle} onClick={() => setIsCompletionsModalOpen(true)}>
+                View More
+              </button>
+
+              <Modal isOpen={isCompletionsModalOpen} onClose={() => setIsCompletionsModalOpen(false)}>
+                <h1 style={sectionHeaderStyle}>Recent Completions</h1>
+                {recentCompletions.map((completion:any, index) => (
+                  <div key={index} style={playerStyle}>
+                    <div><span style={playerNameStyle}>{completion.name || "Anonymous Hunter"}</span></div>
+                    <div style={{ color: '#666' }}>{completion.date.getFullYear()}</div>
+                  </div>
+                ))}
+              </Modal>
+            </div>
           </div>
         </div>
       </div>
-      <div style={{ position: 'fixed', top: '10px', left: '80px' }}>
-        
+      <div>
+        <Modal isOpen={isFlaresModalOpen} onClose={() => setIsFlaresModalOpen(false)}>
+          <div>
+            <h1 style={sectionHeaderStyle}>{(flareTitle == "" || flareTitle == null) ? "Flare Info" : flareTitle}</h1>
+            <p>{flareDescription}</p>
+            <p>Location: {flareX}, {flareY}</p>
+          </div>
+        </Modal>
       </div>
     </div>
   );

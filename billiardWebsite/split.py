@@ -1,37 +1,30 @@
-import sys
+import numpy as np
 
-def cut_parallelogram(corners, x, y):
-    # Calculate the width and height of the parallelogram
-    width = abs(corners[1][0] - corners[0][0])
-    height = abs(corners[1][1] - corners[2][1])
-    
-    # Calculate the number of chunks in each dimension
-    num_chunks_x = width // x
-    num_chunks_y = height // y
-    # Create a list to store the chunks
-    chunks = []
-    
-    for i in range(num_chunks_x):
-        # Calculate the starting x-coordinate of the current column
-        start_x = corners[1][0] - i * x
-        
-        # Iterate over the chunks in the y direction (top to bottom)
-        for j in range(num_chunks_y):
-            # Calculate the starting y-coordinate of the current chunk
-            start_y = corners[1][1] + i * x - j * y
+def divide_parallelogram_by_divisions(corners, x_divisions, y_divisions, max_decimals_x=2, max_decimals_y=2):
+    A = np.array(corners[0])
+    B = np.array(corners[1])
+    C = np.array(corners[2])
+    D = np.array(corners[3])
+
+    # Calculate vectors for width and height
+    width_vector = (B - A) / x_divisions
+    height_vector = (D - A) / y_divisions
+
+    final_corners = [] 
+    # Iterate over the grid and print the corners of each new parallelogram
+    for i in range(x_divisions):
+        for j in range(y_divisions):
+            P1 = A + i * width_vector + j * height_vector
+            P2 = P1 + width_vector
+            P3 = P2 + height_vector
+            P4 = P1 + height_vector
             
-            # Append the coordinates of the current chunk to the list
-            chunks.append(((start_x - x, start_y + x * y),(start_x, start_y),(start_x, start_y - y), (start_x - x, start_y + x * y - y)))
+            # Round the coordinates to deal with floating-point issues
+            P1 = np.round(P1, decimals=max_decimals_x).tolist()
+            P2 = np.round(P2, decimals=max_decimals_x).tolist()
+            P3 = np.round(P3, decimals=max_decimals_y).tolist()
+            P4 = np.round(P4, decimals=max_decimals_y).tolist()
+            
+            final_corners.append([P1, P2, P3, P4])
     
-    return chunks
-
-if __name__ == '__main__':
-    # Parse the input arguments
-    corners = [(int(corner.split(',')[0]), int(corner.split(',')[1])) for corner in [sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]]]
-    x = int(sys.argv[5])
-    y = int(sys.argv[6])
-    
-    # Call the function and print the result
-    chunks = cut_parallelogram(corners, x, y)
-    for chunk in chunks:
-        print(str(chunk).replace('((', '').replace('),', ' ,').replace('(','').replace(', ',',').replace(' ,', ' ').replace('))', ''))
+    return final_corners

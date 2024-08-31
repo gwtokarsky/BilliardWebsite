@@ -142,8 +142,6 @@ export async function addUser(username: string, info:string, password: string) {
         // Insert the user into the database
         const query = `INSERT INTO users (username, info, password) VALUES ($1, $2, $3);`;
         await client.query(query, [username, info, hashedPassword]);
-
-        console.log('User added successfully');
     } catch (error) {
         console.error('Error adding user:', error);
         throw error; // Rethrow the error to be handled by the caller
@@ -194,7 +192,6 @@ export async function checkIfUserExists(username: string): Promise<boolean> {
         await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT * FROM users WHERE username = $1;`;
-        console.log(process.env.DB_SCHEMA)
         const res = await client.query(query, [username]);
 
         if (res.rowCount === 0) {
@@ -219,7 +216,6 @@ export async function loginUser(username: string, password: string): Promise<boo
         await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
         const query = `SELECT * FROM users WHERE username = $1;`;
-        console.log(process.env.DB_SCHEMA)
         const res = await client.query(query, [username]);
 
         if (res.rowCount === 0) {
@@ -247,7 +243,6 @@ export async function loginUser(username: string, password: string): Promise<boo
             await client.query(deleteQuery, [user.id]);
             const insertQuery = `INSERT INTO sessions (user_id, session_id, ip_address, login_date) VALUES ($1, $2, $3, NOW());`;
             await client.query(insertQuery, [user.id, sessionToken, IP()]);
-            console.log('User logged in successfully');
 
             //set the cookie to expire in 1 day
             cookies().set('session_token', sessionToken, { httpOnly: true, secure: true, expires: new Date(Date.now() + 86400000) });
@@ -298,7 +293,8 @@ export async function claimCover(cover_id: number, user_id:string) {
         await client.query(insertQuery, [user_id, cover_id]);
 
         return true;
-    } catch (error) {
+    } 
+    catch (error) {
         return false;
     } finally {
         if (client) {
@@ -317,7 +313,6 @@ async function validateSessionCookie(user_id: string) {
         const cookieStore = cookies();
         const session_cookie = cookieStore.get('session_token');
         if (!session_cookie || session_cookie === undefined || session_cookie === null) {
-            console.log('No session cookie found');
             return false;
         }
         const ip = IP();
@@ -673,7 +668,6 @@ export async function getAllClaimants(cover_id: number) {
                         WHERE c2.id = $1
                         GROUP BY users.id, username, name, date;`;
         const res = await client.query(query, [cover_id]);
-        console.log(res.rows)
         return res.rows;
     } catch (error) {
         console.error('Error getting claimants:', error);
@@ -767,7 +761,6 @@ export async function getUserIdFromCookie() {
         const cookieStore = cookies();
         const session_cookie = cookieStore.get('session_token');
         if (!session_cookie || session_cookie === undefined || session_cookie === null) {
-            console.log('No session cookie found');
             return null;
         }
 
@@ -777,7 +770,6 @@ export async function getUserIdFromCookie() {
         if (res.rowCount === 0) {
             return null;
         }
-        console.log(res.rows[0])
         return res.rows[0].user_id;
     } catch (error) {
         console.error('Error getting user id from cookie:', error);
@@ -798,7 +790,6 @@ async function refreshUserSession(user_id: string) {
         const cookieStore = cookies();
         const session_cookie = cookieStore.get('session_token');
         if (!session_cookie || session_cookie === undefined || session_cookie === null) {
-            console.log('No session cookie found');
             return false;
         }
 
@@ -831,6 +822,26 @@ export async function getDefaultLogo() {
         return res.rows[0].logo;
     } catch (error) {
         console.error('Error getting default logo:', error);
+        return null;
+    } finally {
+        if (client) {
+            client.release(); // Release the client back to the pool
+        }
+    }
+}
+
+export async function getFlares() {
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
+
+        const query = `SELECT * FROM flares;`;
+        const res = await client.query(query);
+
+        return res.rows;
+    } catch (error) {
+        console.error('Error getting flares:', error);
         return null;
     } finally {
         if (client) {
