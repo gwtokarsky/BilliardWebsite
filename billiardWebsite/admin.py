@@ -541,6 +541,20 @@ def select_region_by_point(point: tuple, cursor):
     except (Exception) as error:
         print("Error selecting region id by point:", error)
 
+def select_all_users(cursor):
+    try:
+        cursor.execute("SELECT * FROM users")
+        rows = cursor.fetchall()
+        users = []
+        for row in rows:
+            print(f"ID: {row[0]}, Username: {row[1]}, Name: {row[2]}")
+            users.append((row[1], row[3],))
+        
+        return users
+
+    except (Exception) as error:
+        print("Error selecting all users:", error)
+
 def select_selected_regions(cursor):
     try:
         cursor.execute("SELECT * FROM region Join selected_regions on region.id = selected_regions.region")

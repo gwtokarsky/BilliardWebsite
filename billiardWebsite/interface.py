@@ -52,7 +52,7 @@ def create_region():
     region_window = tk.Toplevel(root)
     region_window.title("Create Region")
 
-    tk.Label(region_window, text="Enter number of points").grid(row=0, column=0)
+    tk.Label(region_window, text="Enter number of points earned").grid(row=0, column=0)
     points_entry = tk.Entry(region_window)
     points_entry.grid(row=0, column=1)
 
@@ -299,6 +299,8 @@ def complete_cover():
 def delete_region():
     def submit():
         region_id = int(region_id_entry.get())
+        #throw warning
+
         admin.delete_region(region_id, cursor)
         conn.commit()
         messagebox.showinfo("Success", "Region deleted successfully")
@@ -686,6 +688,22 @@ def delete_flare():
     submit_button = tk.Button(delete_window, text="Submit", command=submit)
     submit_button.grid(row=2, column=1)
 
+def select_all_usernames():
+    usernames = admin.select_all_users(cursor)
+    username_info = "\n".join([f"Username: {username[0]} | Name: {username[1]}" for username in usernames])
+
+    username_window = tk.Toplevel(root)
+    username_window.title("All Usernames")
+
+    scrollbar = tk.Scrollbar(username_window)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    username_text = tk.Text(username_window, yscrollcommand=scrollbar.set)
+    username_text.insert(tk.END, username_info)
+    username_text.pack(side=tk.LEFT, fill=tk.BOTH)
+
+    scrollbar.config(command=username_text.yview)
+
 
 # Main Tkinter window
 root = tk.Tk()
@@ -755,6 +773,9 @@ if cursor:
 
     delete_flare_button = tk.Button(root, text="Delete Flare", command=delete_flare)
     delete_flare_button.grid(row=3, column=4)
+
+    select_all_usernames_button = tk.Button(root, text="Select All Usernames", command=select_all_usernames)
+    select_all_usernames_button.grid(row=4, column=0)
 
 root.mainloop()
 
