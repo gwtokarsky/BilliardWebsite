@@ -18,6 +18,45 @@ interface Polygon {
   flipHorizontal: boolean;
 }
 
+const STRIP_COLORS = {
+  unclaimed: 'rgba(0, 128, 0, 1)',
+  claimed: 'rgba(255, 255, 0, 1)',
+  done: 'rgba(128, 0, 128, 1)',
+};
+
+const legendStyle = {
+  display: 'flex',
+  flexWrap: 'wrap' as const,
+  alignItems: 'center',
+  gap: '14px',
+  backgroundColor: '#fff',
+  borderRadius: '8px',
+  boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+  padding: '8px 14px',
+  margin: '10px 0',
+  fontSize: '0.85em',
+};
+
+const legendItemStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+};
+
+const legendSwatchStyle = {
+  display: 'inline-block',
+  width: '14px',
+  height: '14px',
+  borderRadius: '3px',
+  border: '1px solid rgba(0,0,0,0.15)',
+};
+
+const legendItems = [
+  { label: 'Unclaimed', color: STRIP_COLORS.unclaimed },
+  { label: 'Claimed', color: STRIP_COLORS.claimed },
+  { label: 'Completed', color: STRIP_COLORS.done },
+];
+
 const dateOptions: Intl.DateTimeFormatOptions = {
   year: 'numeric',
   month: 'short',
@@ -237,9 +276,9 @@ const Game: React.FC<Props> = () => {
         border = 'maroon';
       }
 
-      
-      
-      let polygon: Polygon 
+
+
+      let polygon: Polygon
       if (region.completed && region.logo !== null && region.logo !== undefined && region.logo !== "") {
         img = await loadImage(region.logo);
         polygon = {
@@ -538,10 +577,10 @@ const Game: React.FC<Props> = () => {
       context.strokeStyle = 'black';
 
       if (polygon.stroke == 'maroon') {
-        context.fillStyle = 'rgba(0, 128, 0, 1)';
+        context.fillStyle = STRIP_COLORS.unclaimed;
       }
       else if (polygon.stroke == 'yellow') {
-        context.fillStyle = 'rgba(255, 255, 0, 1)';
+        context.fillStyle = STRIP_COLORS.claimed;
       }
 
       context.stroke();
@@ -915,7 +954,15 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
               Center
             </label>
           </div>
-          <canvas 
+          <div style={legendStyle}>
+            {legendItems.map(item => (
+              <div key={item.label} style={legendItemStyle}>
+                <span style={{ ...legendSwatchStyle, backgroundColor: item.color }} />
+                {item.label}
+              </div>
+            ))}
+          </div>
+          <canvas
             ref={canvasRef}
             width={scale}
             height={scale}
