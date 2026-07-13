@@ -538,8 +538,8 @@ const Game: React.FC<Props> = () => {
       context.strokeStyle = 'black';
 
       if (polygon.stroke == 'maroon') {
-        context.fillStyle = 'rgba(128, 0, 0, 1)';
-      } 
+        context.fillStyle = 'rgba(0, 128, 0, 1)';
+      }
       else if (polygon.stroke == 'yellow') {
         context.fillStyle = 'rgba(255, 255, 0, 1)';
       }
