@@ -63,6 +63,19 @@ const dateOptions: Intl.DateTimeFormatOptions = {
   day: 'numeric'
 };
 
+// completion.date normally arrives as a real Date (Next.js server actions
+// preserve Date objects across the server/client boundary), but this stays
+// defensive in case it ever arrives as a serialized string instead.
+// getUTCFullYear (not getFullYear) is used so the displayed year matches
+// what Postgres stored regardless of the viewer's local timezone.
+function getCompletionYear(value: any): number | null {
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) {
+    return null;
+  }
+  return date.getUTCFullYear();
+}
+
 const containerStyle = {
   display: 'flex',
   flexDirection: 'row',
@@ -1017,7 +1030,7 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
               {recentCompletions.slice(0, 3).map((completion:any, index) => (
                 <div key={index} style={playerStyle}>
                   <div><span style={playerNameStyle}>{completion.name || "Anonymous Hunter"}</span></div>
-                  <div style={{ color: '#666' }}>{completion.date.getFullYear()}</div>
+                  <div style={{ color: '#666' }}>{getCompletionYear(completion.date)}</div>
                 </div>
               ))}
               <button style={buttonStyle} onClick={() => setIsCompletionsModalOpen(true)}>
@@ -1029,7 +1042,7 @@ function getTransformMatrix(srcX: any, srcY: any, dstX: any, dstY: any) {
                 {recentCompletions.map((completion:any, index) => (
                   <div key={index} style={playerStyle}>
                     <div><span style={playerNameStyle}>{completion.name || "Anonymous Hunter"}</span></div>
-                    <div style={{ color: '#666' }}>{completion.date.getFullYear()}</div>
+                    <div style={{ color: '#666' }}>{getCompletionYear(completion.date)}</div>
                   </div>
                 ))}
               </Modal>
