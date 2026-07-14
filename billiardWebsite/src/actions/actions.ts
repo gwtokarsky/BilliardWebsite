@@ -529,6 +529,7 @@ export async function getClaimedCoversForUser(user_id: string) {
     }
 }
 
+// "Global Leaderboard" — all-time totals across all completions, all regions.
 export async function getLeaderboard() {
     let client;
     try {
@@ -553,20 +554,27 @@ export async function getLeaderboard() {
     }
 }
 
+// "Current Leaderboard" — totals from completions made in the current
+// calendar year only, across all regions (no regional filtering).
 export async function getLeaderboardForRegion() {
     let client;
     try {
         client = await pool.connect();
         await client.query('SET search_path TO ' + process.env.DB_SCHEMA);
 
-        const query = `SELECT username, info as name, SUM(points) AS total_points
+        const query = `SELECT
+                            username,
+                            info AS name,
+                            SUM(points) AS total_points
                         FROM users
-                        JOIN user_completed_cover ON users.id = user_completed_cover.user_id
-                        JOIN covers ON user_completed_cover.cover_id = covers.id
-                        JOIN cover_in_region ON covers.id = cover_in_region.cover_id
-                        JOIN selected_regions ON cover_in_region.region_id = selected_regions.region
+                        JOIN user_completed_cover
+                            ON users.id = user_completed_cover.user_id
+                        JOIN covers
+                            ON user_completed_cover.cover_id = covers.id
+                        WHERE user_completed_cover.completion_date >= date_trunc('year', CURRENT_DATE)
+                          AND user_completed_cover.completion_date < date_trunc('year', CURRENT_DATE) + interval '1 year'
                         GROUP BY username, name
-                        ORDER BY total_points DESC;`;
+                        ORDER BY total_points DESC, username ASC;`;
         const res = await client.query(query);
         return res.rows;
     } catch (error) {
